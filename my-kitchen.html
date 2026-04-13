@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Kitchen</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #ff6b35;
+    --orange-light: #fff0eb;
+    --orange-mid: #ffd5c2;
+    --black: #111111;
+    --gray-1: #f7f7f7;
+    --gray-2: #eeeeee;
+    --gray-3: #bbbbbb;
+    --gray-4: #888888;
+    --white: #ffffff;
+    --radius-sm: 12px;
+    --radius-md: 18px;
+    --radius-lg: 26px;
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #f0ede8;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 0;
+  }
+
+  .app {
+    background: var(--white);
+    width: 100%;
+    max-width: 430px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    padding: 52px 24px 0;
+    flex-shrink: 0;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.15rem;
+    color: var(--black);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .logo-dot {
+    width: 10px; height: 10px;
+    background: var(--orange);
+    border-radius: 50%;
+  }
+  .avatar-btn {
+    width: 36px; height: 36px;
+    background: var(--orange-light);
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s var(--ease-spring);
+  }
+  .avatar-btn:hover { transform: scale(1.1); }
+
+  /* ── NAV TABS ── */
+  .nav {
+    display: flex;
+    gap: 4px;
+    background: var(--gray-1);
+    border-radius: 14px;
+    padding: 4px;
+    margin: 0 24px 24px;
+    flex-shrink: 0;
+  }
+  .nav-btn {
+    flex: 1;
+    padding: 9px 6px;
+    border: none;
+    border-radius: 11px;
+    background: transparent;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--gray-4);
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+    white-space: nowrap;
+  }
+  .nav-btn.active {
+    background: var(--white);
+    color: var(--black);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  /* ── SCREENS ── */
+  .screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .screen.active { display: flex; animation: fadeIn 0.3s var(--ease-out); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .screen-scroll { overflow-y: auto; flex: 1; padding-bottom: 24px; }
+  .screen-scroll::-webkit-scrollbar { display: none; }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gray-3);
+    padding: 0 24px;
+    margin-bottom: 10px;
+  }
+
+  /* ── GROCERY LIST ── */
+  .grocery-header { padding: 0 24px 20px; }
+  .grocery-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--black);
+    line-height: 1.1;
+    margin-bottom: 4px;
+  }
+  .grocery-sub { font-size: 0.82rem; color: var(--gray-4); }
+
+  .grocery-add {
+    display: flex;
+    gap: 8px;
+    padding: 0 24px 20px;
+  }
+  .grocery-input {
+    flex: 1;
+    background: var(--gray-1);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.9rem;
+    color: var(--black);
+    outline: none;
+    transition: background 0.2s;
+  }
+  .grocery-input:focus { background: var(--gray-2); }
+  .grocery-input::placeholder { color: var(--gray-3); }
+  .add-btn {
+    background: var(--orange);
+    border: none;
+    border-radius: var(--radius-sm);
+    width: 44px;
+    height: 44px;
+    color: #fff;
+    font-size: 1.4rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s var(--ease-spring), background 0.15s;
+    flex-shrink: 0;
+  }
+  .add-btn:hover { transform: scale(1.08); background: #e85a24; }
+
+  .grocery-list { padding: 0 24px; display: flex; flex-direction: column; gap: 4px; }
+
+  .grocery-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s;
+    animation: slideIn 0.3s var(--ease-spring);
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .grocery-item:hover { background: var(--gray-1); }
+  .grocery-item.checked { opacity: 0.45; }
+
+  .check-circle {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--gray-2);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s var(--ease-spring);
+    font-size: 0.7rem;
+    color: #fff;
+  }
+  .grocery-item.checked .check-circle {
+    background: var(--orange);
+    border-color: var(--orange);
+  }
+  .grocery-item-name {
+    font-size: 0.93rem;
+    font-weight: 500;
+    color: var(--black);
+    flex: 1;
+    transition: text-decoration 0.2s;
+  }
+  .grocery-item.checked .grocery-item-name { text-decoration: line-through; color: var(--gray-3); }
+  .grocery-item-del {
+    opacity: 0;
+    font-size: 1rem;
+    color: var(--gray-3);
+    transition: opacity 0.15s;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  .grocery-item:hover .grocery-item-del { opacity: 1; }
+
+  .grocery-divider {
+    margin: 16px 24px;
+    height: 1px;
+    background: var(--gray-2);
+  }
+
+  .clear-btn {
+    margin: 0 24px;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: var(--gray-4);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-align: left;
+    transition: color 0.15s;
+  }
+  .clear-btn:hover { color: var(--orange); }
+
+  /* ── RECIPES ── */
+  .recipes-header { padding: 0 24px 16px; }
+  .recipes-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--black);
+    margin-bottom: 4px;
+  }
+  .recipes-sub { font-size: 0.82rem; color: var(--gray-4); }
+
+  .recipe-search {
+    margin: 0 24px 20px;
+    background: var(--gray-1);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--gray-3);
+    font-size: 0.88rem;
+    cursor: text;
+  }
+  .recipe-search input {
+    border: none; background: transparent; outline: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.88rem; color: var(--black); flex: 1;
+  }
+  .recipe-search input::placeholder { color: var(--gray-3); }
+
+  .recipe-filters {
+    display: flex;
+    gap: 8px;
+    padding: 0 24px 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .filter-chip {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s var(--ease-spring);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .filter-chip:hover { transform: scale(1.05); }
+  .filter-chip.active { background: var(--black); color: #fff; }
+  .filter-chip:not(.active) { background: var(--gray-1); color: var(--gray-4); }
+
+  .recipe-list { padding: 0 24px; display: flex; flex-direction: column; gap: 8px; }
+
+  .recipe-card {
+    background: var(--gray-1);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-spring), box-shadow 0.2s;
+  }
+  .recipe-card:hover { transform: scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+
+  .recipe-emoji {
+    width: 52px; height: 52px;
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .recipe-info { flex: 1; min-width: 0; }
+  .recipe-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--black);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .recipe-meta { font-size: 0.72rem; color: var(--gray-4); margin-top: 3px; }
+  .recipe-badge {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    background: var(--orange-light);
+    color: var(--orange);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  .recipe-add-card {
+    border: 2px dashed var(--gray-2);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin: 0 24px;
+    margin-top: 8px;
+  }
+  .recipe-add-card:hover { border-color: var(--orange); background: var(--orange-light); }
+  .recipe-add-card-label { font-family: 'Syne', sans-serif; font-size: 0.85rem; font-weight: 700; color: var(--gray-3); }
+  .recipe-add-card:hover .recipe-add-card-label { color: var(--orange); }
+
+  /* ── FRIDGE AI ── */
+  /* ── ADD RECIPE MODAL ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--white);
+    border-radius: 28px 28px 0 0;
+    padding: 28px 24px 40px;
+    width: 100%;
+    max-width: 430px;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp 0.4s var(--ease-spring);
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--gray-2);
+    border-radius: 2px;
+    margin: 0 auto 24px;
+  }
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--black);
+    margin-bottom: 20px;
+  }
+  .modal-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-4);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .modal-input, .modal-textarea {
+    width: 100%;
+    background: var(--gray-1);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.9rem;
+    color: var(--black);
+    outline: none;
+    margin-bottom: 14px;
+    transition: background 0.2s;
+  }
+  .modal-input:focus, .modal-textarea:focus { background: var(--gray-2); }
+  .modal-textarea { resize: none; height: 90px; line-height: 1.5; }
+
+  .modal-save-btn {
+    width: 100%;
+    padding: 15px;
+    background: var(--orange);
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1rem;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-spring), background 0.15s;
+    margin-top: 6px;
+  }
+  .modal-save-btn:hover { transform: scale(1.02); background: #e85a24; }
+
+  /* ── RECIPE DETAIL MODAL ── */
+  .detail-modal {
+    position: fixed;
+    inset: 0;
+    background: var(--white);
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    overflow-y: auto;
+    animation: slideInRight 0.35s var(--ease-out);
+  }
+  .detail-modal.open { display: flex; }
+  @keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+
+  .detail-top {
+    padding: 52px 24px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .detail-back {
+    background: var(--gray-1);
+    border: none;
+    border-radius: 50%;
+    width: 40px; height: 40px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .detail-back:hover { background: var(--gray-2); }
+
+  .detail-add-grocery {
+    background: var(--orange-light);
+    border: none;
+    border-radius: 100px;
+    padding: 9px 16px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--orange);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .detail-add-grocery:hover { background: var(--orange-mid); }
+
+  .detail-hero {
+    font-size: 5rem;
+    text-align: center;
+    padding: 10px 0 20px;
+  }
+  .detail-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--black);
+    padding: 0 24px;
+    margin-bottom: 6px;
+  }
+  .detail-meta {
+    font-size: 0.8rem;
+    color: var(--gray-4);
+    padding: 0 24px;
+    margin-bottom: 24px;
+    display: flex; gap: 12px;
+  }
+  .detail-section {
+    padding: 0 24px;
+    margin-bottom: 20px;
+  }
+  .detail-section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gray-3);
+    margin-bottom: 12px;
+  }
+  .detail-ingredient {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--gray-2);
+    font-size: 0.88rem;
+    color: var(--black);
+  }
+  .detail-ingredient:last-child { border-bottom: none; }
+  .detail-ingredient-dot {
+    width: 6px; height: 6px;
+    background: var(--orange);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .detail-steps { display: flex; flex-direction: column; gap: 6px; }
+  .detail-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--black);
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .detail-step:hover { background: var(--gray-1); }
+  .detail-step.done { background: var(--gray-1); }
+  .detail-step.done .detail-step-text { color: var(--gray-3); text-decoration: line-through; }
+  .detail-step.done .detail-step-check { background: var(--orange); border-color: var(--orange); }
+  .detail-step-check {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--gray-2);
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem;
+    color: #fff;
+    transition: all 0.2s var(--ease-spring);
+  }
+  .detail-step-num {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    color: var(--orange);
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    min-width: 22px;
+    padding-top: 2px;
+  }
+  .detail-step.done .detail-step-num { color: var(--gray-3); }
+  .detail-step-text { flex: 1; }
+
+  /* ── COOKING MODE ── */
+  .cooking-modal {
+    position: fixed;
+    inset: 0;
+    background: #111;
+    z-index: 300;
+    display: none;
+    flex-direction: column;
+    animation: fadeIn 0.35s var(--ease-out);
+  }
+  .cooking-modal.open { display: flex; }
+
+  .cooking-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .cooking-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .cooking-emoji { font-size: 1.5rem; }
+  .cooking-recipe-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1rem;
+    color: #fff;
+  }
+  .cooking-close {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    border-radius: 50%;
+    width: 36px; height: 36px;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .cooking-close:hover { background: rgba(255,255,255,0.18); }
+
+  /* Step progress bar */
+  .cooking-progress {
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .cooking-progress-fill {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 2px;
+    transition: width 0.4s var(--ease-out);
+  }
+
+  /* Two-column landscape layout */
+  .cooking-body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    overflow: hidden;
+  }
+
+  /* Left: ingredients */
+  .cooking-ingredients-panel {
+    border-right: 1px solid rgba(255,255,255,0.08);
+    overflow-y: auto;
+    padding: 24px 20px;
+  }
+  .cooking-ingredients-panel::-webkit-scrollbar { width: 4px; }
+  .cooking-ingredients-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  .cooking-panel-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+    margin-bottom: 14px;
+  }
+
+  .cooking-ingredient-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 0.88rem;
+    color: rgba(255,255,255,0.7);
+  }
+  .cooking-ingredient-item:hover { background: rgba(255,255,255,0.05); }
+  .cooking-ingredient-item.ticked { color: rgba(255,255,255,0.25); text-decoration: line-through; }
+
+  .cooking-ing-check {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem;
+    color: #fff;
+    transition: all 0.2s var(--ease-spring);
+  }
+  .cooking-ingredient-item.ticked .cooking-ing-check {
+    background: var(--orange);
+    border-color: var(--orange);
+  }
+
+  /* Right: steps */
+  .cooking-steps-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 24px 28px;
+  }
+
+  .cooking-step-counter {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 16px;
+  }
+
+  .cooking-step-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+
+  .cooking-step-num-big {
+    font-family: 'Syne', sans-serif;
+    font-size: 5rem;
+    font-weight: 800;
+    color: rgba(255,255,255,0.06);
+    line-height: 1;
+    margin-right: 20px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .cooking-step-text {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+    font-weight: 400;
+    color: #fff;
+    line-height: 1.6;
+    animation: stepFadeIn 0.35s var(--ease-out);
+  }
+  @keyframes stepFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .cooking-nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin-top: 16px;
+  }
+
+  .cooking-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.08);
+    border: none;
+    border-radius: 100px;
+    padding: 12px 22px;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.2s var(--ease-spring);
+  }
+  .cooking-nav-btn:hover { background: rgba(255,255,255,0.14); transform: scale(1.04); }
+  .cooking-nav-btn:disabled { opacity: 0.2; pointer-events: none; }
+  .cooking-nav-btn.next { background: var(--orange); }
+  .cooking-nav-btn.next:hover { background: #e85a24; }
+  .cooking-nav-btn.done { background: #2ecc71; }
+  .cooking-nav-btn.done:hover { background: #27ae60; }
+
+  /* Finished screen */
+  .cooking-done {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    text-align: center;
+    padding: 40px;
+    animation: stepFadeIn 0.4s var(--ease-out);
+  }
+  .cooking-done.visible { display: flex; }
+  .cooking-done-emoji { font-size: 5rem; margin-bottom: 20px; }
+  .cooking-done-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .cooking-done-sub { font-size: 1rem; color: rgba(255,255,255,0.5); margin-bottom: 32px; }
+  .cooking-done-btn {
+    background: var(--orange);
+    border: none;
+    border-radius: 100px;
+    padding: 14px 32px;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-spring);
+  }
+  .cooking-done-btn:hover { transform: scale(1.05); }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--black);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 100px;
+    font-size: 0.83rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: transform 0.4s var(--ease-spring);
+    z-index: 999;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-top">
+      <div class="logo"><span class="logo-dot"></span> My Kitchen</div>
+      <button class="avatar-btn">👩</button>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav">
+    <button class="nav-btn" data-tab="grocery">🛒 Grocery</button>
+    <button class="nav-btn" data-tab="recipes">📖 Recipes</button>
+  </div>
+
+  <!-- GROCERY SCREEN -->
+  <div class="screen" id="screen-grocery">
+    <div class="screen-scroll">
+      <div class="grocery-header">
+        <div class="grocery-title">Grocery<br>List</div>
+        <div class="grocery-sub" id="grocery-count">0 items</div>
+      </div>
+      <div class="grocery-add">
+        <input class="grocery-input" id="grocery-input" placeholder="Add an item..." />
+        <button class="add-btn" id="grocery-add-btn">+</button>
+      </div>
+      <div class="section-label">Items</div>
+      <div class="grocery-list" id="grocery-list"></div>
+      <div class="grocery-divider" id="grocery-divider" style="display:none;"></div>
+      <button class="clear-btn" id="clear-checked" style="display:none;">Clear checked items</button>
+    </div>
+  </div>
+
+  <!-- RECIPES SCREEN -->
+  <div class="screen" id="screen-recipes">
+    <div class="screen-scroll">
+      <div class="recipes-header">
+        <div class="recipes-title">Your<br>Recipes</div>
+        <div class="recipes-sub" id="recipe-count">0 recipes saved</div>
+      </div>
+      <div class="recipe-search">
+        <span>🔍</span>
+        <input id="recipe-search" placeholder="Search recipes..." />
+      </div>
+      <div class="recipe-filters" id="recipe-filters">
+        <button class="filter-chip active" data-filter="all">All</button>
+        <button class="filter-chip" data-filter="quick">Quick ⚡</button>
+        <button class="filter-chip" data-filter="family">Family 💛</button>
+        <button class="filter-chip" data-filter="veggie">Veggie 🌱</button>
+      </div>
+      <div class="section-label">Saved recipes</div>
+      <div class="recipe-list" id="recipe-list"></div>
+      <div class="recipe-add-card" id="recipe-add-btn">
+        <div style="font-size:1.5rem;margin-bottom:6px;">+</div>
+        <div class="recipe-add-card-label">Add a recipe</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ADD RECIPE MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Add a Recipe</div>
+
+    <div class="manual-area" id="manual-area">
+      <label class="modal-label">Recipe name</label>
+      <input class="modal-input" id="recipe-name-input" placeholder="e.g. Pasta Carbonara" />
+      <label class="modal-label">Emoji</label>
+      <input class="modal-input" id="recipe-emoji-input" placeholder="🍝" style="font-size:1.3rem;width:70px;" />
+      <label class="modal-label">Time & servings</label>
+      <input class="modal-input" id="recipe-meta-input" placeholder="e.g. 30 min · 4 servings" />
+      <label class="modal-label">Category</label>
+      <input class="modal-input" id="recipe-tag-input" placeholder="e.g. Pasta, Family, Soup..." />
+      <label class="modal-label">Ingredients (one per line)</label>
+      <textarea class="modal-textarea" id="recipe-ingredients-input" placeholder="200g pasta&#10;2 eggs&#10;100g parmesan&#10;guanciale"></textarea>
+      <label class="modal-label">Steps (one per line)</label>
+      <textarea class="modal-textarea" id="recipe-steps-input" placeholder="Boil pasta until al dente&#10;Mix eggs and cheese&#10;Combine everything off heat"></textarea>
+    </div>
+
+    <button class="modal-save-btn" id="modal-save-btn">Save Recipe</button>
+  </div>
+</div>
+
+<!-- RECIPE DETAIL MODAL -->
+<div class="detail-modal" id="detail-modal">
+  <div class="detail-top">
+    <button class="detail-back" id="detail-back">←</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="detail-add-grocery" id="detail-add-grocery">+ Grocery list</button>
+      <button class="detail-add-grocery" id="detail-cook-btn" style="background:var(--orange);color:#fff;">👨‍🍳 Cook</button>
+    </div>
+  </div>
+  <div class="detail-hero" id="detail-emoji"></div>
+  <div class="detail-name" id="detail-name"></div>
+  <div class="detail-meta" id="detail-meta"></div>
+  <div class="detail-section">
+    <div class="detail-section-title">Ingredients</div>
+    <div id="detail-ingredients"></div>
+  </div>
+  <div class="detail-section">
+    <div class="detail-section-title">Steps</div>
+    <div class="detail-steps" id="detail-steps"></div>
+  </div>
+</div>
+
+<!-- COOKING MODE -->
+<div class="cooking-modal" id="cooking-modal">
+  <div class="cooking-header">
+    <div class="cooking-title-row">
+      <span class="cooking-emoji" id="cooking-emoji"></span>
+      <span class="cooking-recipe-name" id="cooking-name"></span>
+    </div>
+    <button class="cooking-close" id="cooking-close">✕</button>
+  </div>
+  <div class="cooking-progress">
+    <div class="cooking-progress-fill" id="cooking-progress-fill"></div>
+  </div>
+
+  <div class="cooking-body" id="cooking-body">
+    <!-- Left: ingredients -->
+    <div class="cooking-ingredients-panel">
+      <div class="cooking-panel-label">Ingredients</div>
+      <div id="cooking-ingredients-list"></div>
+    </div>
+
+    <!-- Right: steps -->
+    <div class="cooking-steps-panel">
+      <div class="cooking-step-counter" id="cooking-step-counter"></div>
+      <div class="cooking-step-content">
+        <div class="cooking-step-num-big" id="cooking-step-num-big"></div>
+        <div class="cooking-step-text" id="cooking-step-text"></div>
+      </div>
+      <div class="cooking-nav-row">
+        <button class="cooking-nav-btn" id="cooking-prev">← Prev</button>
+        <button class="cooking-nav-btn next" id="cooking-next">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done screen -->
+  <div class="cooking-done" id="cooking-done">
+    <div class="cooking-done-emoji">🎉</div>
+    <div class="cooking-done-title">Enjoy your meal!</div>
+    <div class="cooking-done-sub" id="cooking-done-sub"></div>
+    <button class="cooking-done-btn" id="cooking-done-btn">Back to recipe</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+let groceryItems = JSON.parse(localStorage.getItem('mk-grocery') || '[]');
+let recipes = JSON.parse(localStorage.getItem('mk-recipes') || '[]');
+let activeFilter = 'all';
+let currentRecipe = null;
+let addMode = 'manual';
+
+// ── Default recipes ──
+if (recipes.length === 0) {
+  recipes = [
+    { id: 1, name: 'Pasta Carbonara', emoji: '🍝', meta: '30 min · 4 servings', tag: 'Pasta', ingredients: ['200g spaghetti', '150g guanciale', '3 eggs', '80g pecorino romano', 'Black pepper'], steps: ['Boil pasta in salted water until al dente.', 'Fry guanciale until crispy.', 'Mix eggs and grated pecorino in a bowl.', 'Drain pasta, combine with guanciale off heat.', 'Add egg mixture, toss quickly. Season with black pepper.'] },
+    { id: 2, name: 'Mormors köttbullar', emoji: '🥘', meta: '45 min · 6 servings', tag: 'Family', ingredients: ['500g minced meat', '1 onion', '1 egg', '3 tbsp breadcrumbs', '2 tbsp milk', 'Salt, pepper, allspice'], steps: ['Mix all ingredients gently until combined.', 'Roll into small balls with wet hands.', 'Fry in butter on medium heat until golden.', 'Make a cream sauce with the pan drippings.', 'Serve with mashed potatoes and lingonberry jam.'] },
+    { id: 3, name: 'Linssoppa', emoji: '🍲', meta: '25 min · 4 servings', tag: 'Veggie', ingredients: ['300g red lentils', '1 onion', '2 garlic cloves', '1 can tomatoes', '1 tsp cumin', 'Vegetable broth'], steps: ['Sauté onion and garlic until soft.', 'Add cumin and toast 1 minute.', 'Add lentils, tomatoes, and broth.', 'Simmer 20 minutes until lentils are soft.', 'Season and serve with crusty bread.'] }
+  ];
+  saveRecipes();
+}
+
+// ── UTILS ──
+function saveGrocery() { localStorage.setItem('mk-grocery', JSON.stringify(groceryItems)); }
+function saveRecipes() { localStorage.setItem('mk-recipes', JSON.stringify(recipes)); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ── NAV ──
+function switchTab(tab) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + tab));
+}
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ── GROCERY ──
+function renderGrocery() {
+  const list = document.getElementById('grocery-list');
+  const count = document.getElementById('grocery-count');
+  const divider = document.getElementById('grocery-divider');
+  const clearBtn = document.getElementById('clear-checked');
+  const unchecked = groceryItems.filter(i => !i.checked);
+  const checked = groceryItems.filter(i => i.checked);
+  count.textContent = groceryItems.length + ' item' + (groceryItems.length !== 1 ? 's' : '');
+  list.innerHTML = '';
+
+  [...unchecked, ...checked].forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'grocery-item' + (item.checked ? ' checked' : '');
+    el.innerHTML = `
+      <div class="check-circle">${item.checked ? '✓' : ''}</div>
+      <div class="grocery-item-name">${item.name}</div>
+      <span class="grocery-item-del" data-id="${item.id}">✕</span>
+    `;
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('grocery-item-del')) {
+        groceryItems = groceryItems.filter(i => i.id !== item.id);
+        saveGrocery(); renderGrocery();
+      } else {
+        item.checked = !item.checked;
+        saveGrocery(); renderGrocery();
+      }
+    });
+    list.appendChild(el);
+  });
+
+  const hasChecked = checked.length > 0;
+  divider.style.display = hasChecked ? 'block' : 'none';
+  clearBtn.style.display = hasChecked ? 'block' : 'none';
+}
+
+document.getElementById('grocery-add-btn').addEventListener('click', addGroceryItem);
+document.getElementById('grocery-input').addEventListener('keydown', e => { if (e.key === 'Enter') addGroceryItem(); });
+
+function addGroceryItem() {
+  const input = document.getElementById('grocery-input');
+  const val = input.value.trim();
+  if (!val) return;
+  groceryItems.push({ id: Date.now(), name: val, checked: false });
+  input.value = '';
+  saveGrocery();
+  renderGrocery();
+}
+
+document.getElementById('clear-checked').addEventListener('click', () => {
+  groceryItems = groceryItems.filter(i => !i.checked);
+  saveGrocery(); renderGrocery();
+});
+
+// ── RECIPES ──
+function renderRecipes() {
+  const list = document.getElementById('recipe-list');
+  const count = document.getElementById('recipe-count');
+  const search = document.getElementById('recipe-search').value.toLowerCase();
+  count.textContent = recipes.length + ' recipe' + (recipes.length !== 1 ? 's' : '') + ' saved';
+  list.innerHTML = '';
+
+  const filtered = recipes.filter(r => {
+    const matchFilter = activeFilter === 'all' ||
+      (activeFilter === 'quick' && r.meta.includes('min') && parseInt(r.meta) <= 30) ||
+      (activeFilter === 'family' && r.tag.toLowerCase().includes('family')) ||
+      (activeFilter === 'veggie' && (r.tag.toLowerCase().includes('veggie') || r.tag.toLowerCase().includes('veg')));
+    const matchSearch = r.name.toLowerCase().includes(search);
+    return matchFilter && matchSearch;
+  });
+
+  filtered.forEach(recipe => {
+    const el = document.createElement('div');
+    el.className = 'recipe-card';
+    el.innerHTML = `
+      <div class="recipe-emoji">${recipe.emoji}</div>
+      <div class="recipe-info">
+        <div class="recipe-name">${recipe.name}</div>
+        <div class="recipe-meta">${recipe.meta}</div>
+      </div>
+      <div class="recipe-badge">${recipe.tag}</div>
+    `;
+    el.addEventListener('click', () => openRecipeDetail(recipe));
+    list.appendChild(el);
+  });
+}
+
+document.getElementById('recipe-search').addEventListener('input', renderRecipes);
+
+document.querySelectorAll('.filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    activeFilter = chip.dataset.filter;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c === chip));
+    renderRecipes();
+  });
+});
+
+// ── RECIPE DETAIL ──
+function openRecipeDetail(recipe) {
+  currentRecipe = recipe;
+  document.getElementById('detail-emoji').textContent = recipe.emoji;
+  document.getElementById('detail-name').textContent = recipe.name;
+  document.getElementById('detail-meta').innerHTML = `<span>⏱ ${recipe.meta}</span><span>🏷 ${recipe.tag}</span>`;
+  const ingDiv = document.getElementById('detail-ingredients');
+  ingDiv.innerHTML = (recipe.ingredients || []).map(i => `
+    <div class="detail-ingredient"><div class="detail-ingredient-dot"></div>${i}</div>
+  `).join('');
+  const stepsDiv = document.getElementById('detail-steps');
+  stepsDiv.innerHTML = (recipe.steps || []).map((s, i) => `
+    <div class="detail-step" data-step="${i}">
+      <div class="detail-step-num">${String(i+1).padStart(2,'0')}</div>
+      <div class="detail-step-check"></div>
+      <div class="detail-step-text">${s}</div>
+    </div>
+  `).join('');
+  stepsDiv.querySelectorAll('.detail-step').forEach(el => {
+    el.addEventListener('click', () => {
+      el.classList.toggle('done');
+      el.querySelector('.detail-step-check').textContent = el.classList.contains('done') ? '✓' : '';
+    });
+  });
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+document.getElementById('detail-back').addEventListener('click', () => {
+  document.getElementById('detail-modal').classList.remove('open');
+});
+
+document.getElementById('detail-add-grocery').addEventListener('click', () => {
+  if (!currentRecipe) return;
+  const newItems = (currentRecipe.ingredients || []).map(ing => ({
+    id: Date.now() + Math.random(),
+    name: ing,
+    checked: false
+  }));
+  groceryItems.push(...newItems);
+  saveGrocery();
+  showToast(`${newItems.length} ingredients added to grocery list 🛒`);
+  document.getElementById('detail-modal').classList.remove('open');
+  switchTab('grocery');
+  renderGrocery();
+});
+
+// ── ADD RECIPE MODAL ──
+document.getElementById('recipe-add-btn').addEventListener('click', () => {
+  document.getElementById('add-modal').classList.add('open');
+});
+document.getElementById('add-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('add-modal')) {
+    document.getElementById('add-modal').classList.remove('open');
+  }
+});
+
+document.getElementById('modal-save-btn').addEventListener('click', () => {
+  const name = document.getElementById('recipe-name-input').value.trim();
+  if (!name) { showToast('Please add a recipe name'); return; }
+  const recipe = {
+    id: Date.now(),
+    name,
+    emoji: document.getElementById('recipe-emoji-input').value.trim() || '🍽',
+    meta: document.getElementById('recipe-meta-input').value.trim() || '— min',
+    tag: document.getElementById('recipe-tag-input').value.trim() || 'Other',
+    ingredients: document.getElementById('recipe-ingredients-input').value.trim().split('\n').filter(Boolean),
+    steps: document.getElementById('recipe-steps-input').value.trim().split('\n').filter(Boolean)
+  };
+  recipes.unshift(recipe);
+  saveRecipes();
+  renderRecipes();
+  document.getElementById('add-modal').classList.remove('open');
+  ['recipe-name-input','recipe-emoji-input','recipe-meta-input','recipe-tag-input','recipe-ingredients-input','recipe-steps-input'].forEach(id => document.getElementById(id).value = '');
+  showToast('Recipe saved! 🎉');
+});
+
+// ── COOKING MODE ──
+let cookingStep = 0;
+let cookingIngTicked = [];
+
+function openCookingMode(recipe) {
+  cookingStep = 0;
+  cookingIngTicked = new Array(recipe.ingredients.length).fill(false);
+
+  document.getElementById('cooking-emoji').textContent = recipe.emoji;
+  document.getElementById('cooking-name').textContent = recipe.name;
+  document.getElementById('cooking-done-sub').textContent = `You just made ${recipe.name} 🍽`;
+
+  // Ingredients
+  const ingList = document.getElementById('cooking-ingredients-list');
+  ingList.innerHTML = (recipe.ingredients || []).map((ing, i) => `
+    <div class="cooking-ingredient-item" data-idx="${i}">
+      <div class="cooking-ing-check"></div>
+      <span>${ing}</span>
+    </div>
+  `).join('');
+  ingList.querySelectorAll('.cooking-ingredient-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.idx);
+      cookingIngTicked[idx] = !cookingIngTicked[idx];
+      el.classList.toggle('ticked', cookingIngTicked[idx]);
+      el.querySelector('.cooking-ing-check').textContent = cookingIngTicked[idx] ? '✓' : '';
+    });
+  });
+
+  document.getElementById('cooking-body').style.display = 'grid';
+  document.getElementById('cooking-done').classList.remove('visible');
+  document.getElementById('cooking-modal').classList.add('open');
+  renderCookingStep(recipe);
+}
+
+function renderCookingStep(recipe) {
+  const steps = recipe.steps || [];
+  const total = steps.length;
+  const pct = ((cookingStep + 1) / total) * 100;
+
+  document.getElementById('cooking-step-counter').textContent = `Step ${cookingStep + 1} of ${total}`;
+  document.getElementById('cooking-step-num-big').textContent = String(cookingStep + 1).padStart(2, '0');
+
+  // Re-render for animation
+  const textEl = document.getElementById('cooking-step-text');
+  textEl.style.animation = 'none';
+  textEl.offsetHeight; // reflow
+  textEl.style.animation = '';
+  textEl.textContent = steps[cookingStep];
+
+  document.getElementById('cooking-progress-fill').style.width = pct + '%';
+
+  const prevBtn = document.getElementById('cooking-prev');
+  const nextBtn = document.getElementById('cooking-next');
+  prevBtn.disabled = cookingStep === 0;
+
+  if (cookingStep === total - 1) {
+    nextBtn.textContent = '🎉 Finish';
+    nextBtn.className = 'cooking-nav-btn done';
+  } else {
+    nextBtn.textContent = 'Next →';
+    nextBtn.className = 'cooking-nav-btn next';
+  }
+}
+
+document.getElementById('detail-cook-btn').addEventListener('click', () => {
+  if (!currentRecipe) return;
+  openCookingMode(currentRecipe);
+});
+
+document.getElementById('cooking-prev').addEventListener('click', () => {
+  if (cookingStep > 0) { cookingStep--; renderCookingStep(currentRecipe); }
+});
+
+document.getElementById('cooking-next').addEventListener('click', () => {
+  const steps = currentRecipe.steps || [];
+  if (cookingStep < steps.length - 1) {
+    cookingStep++;
+    renderCookingStep(currentRecipe);
+  } else {
+    // Show done screen
+    document.getElementById('cooking-body').style.display = 'none';
+    document.getElementById('cooking-done').classList.add('visible');
+    document.getElementById('cooking-progress-fill').style.width = '100%';
+  }
+});
+
+document.getElementById('cooking-close').addEventListener('click', () => {
+  document.getElementById('cooking-modal').classList.remove('open');
+});
+
+document.getElementById('cooking-done-btn').addEventListener('click', () => {
+  document.getElementById('cooking-modal').classList.remove('open');
+});
+
+
+switchTab('grocery');
+renderGrocery();
+renderRecipes();
+</script>
+</body>
+</html>
