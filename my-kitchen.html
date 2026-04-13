@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Kitchen</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<title>Mitt Kök</title>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
   :root {
     --orange: #ff6b35;
@@ -48,7 +48,7 @@
 
   /* ── HEADER ── */
   .header {
-    padding: 52px 24px 0;
+    padding: 36px 24px 0;
     flex-shrink: 0;
   }
   .header-top {
@@ -58,9 +58,10 @@
     margin-bottom: 28px;
   }
   .logo {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
     font-size: 1.15rem;
+    letter-spacing: 0.01em;
     color: var(--black);
     display: flex;
     align-items: center;
@@ -72,12 +73,12 @@
     border-radius: 50%;
   }
   .avatar-btn {
-    width: 36px; height: 36px;
+    width: 44px; height: 44px;
     background: var(--orange-light);
     border-radius: 50%;
     border: none;
     cursor: pointer;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     display: flex; align-items: center; justify-content: center;
     transition: transform 0.2s var(--ease-spring);
   }
@@ -99,8 +100,8 @@
     border: none;
     border-radius: 11px;
     background: transparent;
-    font-family: 'Syne', sans-serif;
-    font-size: 0.72rem;
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.82rem;
     font-weight: 700;
     color: var(--gray-4);
     cursor: pointer;
@@ -127,7 +128,7 @@
 
   /* ── SECTION LABEL ── */
   .section-label {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.12em;
@@ -140,11 +141,12 @@
   /* ── GROCERY LIST ── */
   .grocery-header { padding: 0 24px 20px; }
   .grocery-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.8rem;
-    font-weight: 800;
+    font-family: 'Raleway', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
     color: var(--black);
-    line-height: 1.1;
+    line-height: 1.3;
     margin-bottom: 4px;
   }
   .grocery-sub { font-size: 0.82rem; color: var(--gray-4); }
@@ -172,8 +174,8 @@
     background: var(--orange);
     border: none;
     border-radius: var(--radius-sm);
-    width: 44px;
-    height: 44px;
+    width: 52px;
+    align-self: stretch;
     color: #fff;
     font-size: 1.4rem;
     cursor: pointer;
@@ -234,6 +236,16 @@
   }
   .grocery-item:hover .grocery-item-del { opacity: 1; }
 
+  .grocery-category-header {
+    padding: 14px 24px 6px;
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gray-3);
+  }
+
   .grocery-divider {
     margin: 16px 24px;
     height: 1px;
@@ -257,9 +269,10 @@
   /* ── RECIPES ── */
   .recipes-header { padding: 0 24px 16px; }
   .recipes-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.8rem;
-    font-weight: 800;
+    font-family: 'Raleway', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
     color: var(--black);
     margin-bottom: 4px;
   }
@@ -331,7 +344,7 @@
   }
   .recipe-info { flex: 1; min-width: 0; }
   .recipe-name {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-weight: 700;
     font-size: 0.95rem;
     color: var(--black);
@@ -362,7 +375,7 @@
     margin-top: 8px;
   }
   .recipe-add-card:hover { border-color: var(--orange); background: var(--orange-light); }
-  .recipe-add-card-label { font-family: 'Syne', sans-serif; font-size: 0.85rem; font-weight: 700; color: var(--gray-3); }
+  .recipe-add-card-label { font-family: 'Raleway', sans-serif; font-size: 0.85rem; font-weight: 700; color: var(--gray-3); }
   .recipe-add-card:hover .recipe-add-card-label { color: var(--orange); }
 
   /* ── FRIDGE AI ── */
@@ -401,7 +414,7 @@
     margin: 0 auto 24px;
   }
   .modal-title {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-size: 1.3rem;
     font-weight: 800;
     color: var(--black);
@@ -438,7 +451,7 @@
     background: var(--orange);
     border: none;
     border-radius: var(--radius-md);
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-weight: 800;
     font-size: 1rem;
     color: #fff;
@@ -488,7 +501,7 @@
     border: none;
     border-radius: 100px;
     padding: 9px 16px;
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--orange);
@@ -503,7 +516,7 @@
     padding: 10px 0 20px;
   }
   .detail-name {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-size: 1.7rem;
     font-weight: 800;
     color: var(--black);
@@ -522,7 +535,7 @@
     margin-bottom: 20px;
   }
   .detail-section-title {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.12em;
@@ -576,7 +589,7 @@
     transition: all 0.2s var(--ease-spring);
   }
   .detail-step-num {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-weight: 800;
     color: var(--orange);
     font-size: 0.85rem;
@@ -614,7 +627,7 @@
   }
   .cooking-emoji { font-size: 1.5rem; }
   .cooking-recipe-name {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-weight: 800;
     font-size: 1rem;
     color: #fff;
@@ -665,7 +678,7 @@
   .cooking-ingredients-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 
   .cooking-panel-label {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-size: 0.65rem;
     font-weight: 700;
     letter-spacing: 0.14em;
@@ -712,7 +725,7 @@
   }
 
   .cooking-step-counter {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-size: 0.7rem;
     font-weight: 700;
     letter-spacing: 0.14em;
@@ -728,7 +741,7 @@
   }
 
   .cooking-step-num-big {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-size: 5rem;
     font-weight: 800;
     color: rgba(255,255,255,0.06);
@@ -769,7 +782,7 @@
     border-radius: 100px;
     padding: 12px 22px;
     color: #fff;
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-weight: 700;
     font-size: 0.85rem;
     cursor: pointer;
@@ -796,7 +809,7 @@
   .cooking-done.visible { display: flex; }
   .cooking-done-emoji { font-size: 5rem; margin-bottom: 20px; }
   .cooking-done-title {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-size: 2rem;
     font-weight: 800;
     color: #fff;
@@ -809,7 +822,7 @@
     border-radius: 100px;
     padding: 14px 32px;
     color: #fff;
-    font-family: 'Syne', sans-serif;
+    font-family: 'Raleway', sans-serif;
     font-weight: 800;
     font-size: 0.95rem;
     cursor: pointer;
@@ -844,32 +857,37 @@
   <!-- HEADER -->
   <div class="header">
     <div class="header-top">
-      <div class="logo"><span class="logo-dot"></span> My Kitchen</div>
+      <div class="logo"><span class="logo-dot"></span> Mitt Kök</div>
       <button class="avatar-btn">👩</button>
     </div>
   </div>
 
   <!-- NAV -->
   <div class="nav">
-    <button class="nav-btn" data-tab="grocery">🛒 Grocery</button>
-    <button class="nav-btn" data-tab="recipes">📖 Recipes</button>
+    <button class="nav-btn" data-tab="grocery">🛒 Inköp</button>
+    <button class="nav-btn" data-tab="recipes">📖 Recept</button>
   </div>
 
   <!-- GROCERY SCREEN -->
   <div class="screen" id="screen-grocery">
     <div class="screen-scroll">
       <div class="grocery-header">
-        <div class="grocery-title">Grocery<br>List</div>
-        <div class="grocery-sub" id="grocery-count">0 items</div>
+        <div class="grocery-title">Inköpslista</div>
+        <div class="grocery-sub" id="grocery-count">0 varor</div>
       </div>
       <div class="grocery-add">
-        <input class="grocery-input" id="grocery-input" placeholder="Add an item..." />
+        <input class="grocery-input" id="grocery-input" placeholder="Lägg till en vara..." />
         <button class="add-btn" id="grocery-add-btn">+</button>
       </div>
-      <div class="section-label">Items</div>
+      <div class="section-label" id="grocery-section-label">Varor</div>
       <div class="grocery-list" id="grocery-list"></div>
+      <div id="grocery-empty" style="display:none; text-align:center; padding: 40px 24px; color: var(--gray-3);">
+        <div style="font-size: 2.5rem; margin-bottom: 12px;">🛒</div>
+        <div style="font-family: 'Raleway', sans-serif; font-weight: 700; font-size: 0.95rem; color: var(--gray-4); margin-bottom: 6px;">Din lista är tom</div>
+        <div style="font-size: 0.82rem;">Lägg till din första vara ovan</div>
+      </div>
       <div class="grocery-divider" id="grocery-divider" style="display:none;"></div>
-      <button class="clear-btn" id="clear-checked" style="display:none;">Clear checked items</button>
+      <button class="clear-btn" id="clear-checked" style="display:none;">Rensa markerade varor</button>
     </div>
   </div>
 
@@ -877,24 +895,24 @@
   <div class="screen" id="screen-recipes">
     <div class="screen-scroll">
       <div class="recipes-header">
-        <div class="recipes-title">Your<br>Recipes</div>
-        <div class="recipes-sub" id="recipe-count">0 recipes saved</div>
+        <div class="recipes-title">Dina recept</div>
+        <div class="recipes-sub" id="recipe-count">0 recept sparade</div>
       </div>
       <div class="recipe-search">
         <span>🔍</span>
-        <input id="recipe-search" placeholder="Search recipes..." />
+        <input id="recipe-search" placeholder="Sök recept..." />
       </div>
       <div class="recipe-filters" id="recipe-filters">
-        <button class="filter-chip active" data-filter="all">All</button>
-        <button class="filter-chip" data-filter="quick">Quick ⚡</button>
-        <button class="filter-chip" data-filter="family">Family 💛</button>
-        <button class="filter-chip" data-filter="veggie">Veggie 🌱</button>
+        <button class="filter-chip active" data-filter="all">Alla</button>
+        <button class="filter-chip" data-filter="quick">Snabbt ⚡</button>
+        <button class="filter-chip" data-filter="family">Familj 💛</button>
+        <button class="filter-chip" data-filter="veggie">Veggo 🌱</button>
       </div>
-      <div class="section-label">Saved recipes</div>
+      <div class="section-label">Sparade recept</div>
       <div class="recipe-list" id="recipe-list"></div>
       <div class="recipe-add-card" id="recipe-add-btn">
         <div style="font-size:1.5rem;margin-bottom:6px;">+</div>
-        <div class="recipe-add-card-label">Add a recipe</div>
+        <div class="recipe-add-card-label">Lägg till recept</div>
       </div>
     </div>
   </div>
@@ -905,24 +923,24 @@
 <div class="modal-overlay" id="add-modal">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Add a Recipe</div>
+    <div class="modal-title">Lägg till recept</div>
 
     <div class="manual-area" id="manual-area">
-      <label class="modal-label">Recipe name</label>
-      <input class="modal-input" id="recipe-name-input" placeholder="e.g. Pasta Carbonara" />
+      <label class="modal-label">Receptnamn</label>
+      <input class="modal-input" id="recipe-name-input" placeholder="t.ex. Pasta Carbonara" />
       <label class="modal-label">Emoji</label>
       <input class="modal-input" id="recipe-emoji-input" placeholder="🍝" style="font-size:1.3rem;width:70px;" />
-      <label class="modal-label">Time & servings</label>
-      <input class="modal-input" id="recipe-meta-input" placeholder="e.g. 30 min · 4 servings" />
-      <label class="modal-label">Category</label>
-      <input class="modal-input" id="recipe-tag-input" placeholder="e.g. Pasta, Family, Soup..." />
-      <label class="modal-label">Ingredients (one per line)</label>
-      <textarea class="modal-textarea" id="recipe-ingredients-input" placeholder="200g pasta&#10;2 eggs&#10;100g parmesan&#10;guanciale"></textarea>
-      <label class="modal-label">Steps (one per line)</label>
-      <textarea class="modal-textarea" id="recipe-steps-input" placeholder="Boil pasta until al dente&#10;Mix eggs and cheese&#10;Combine everything off heat"></textarea>
+      <label class="modal-label">Tid & portioner</label>
+      <input class="modal-input" id="recipe-meta-input" placeholder="t.ex. 30 min · 4 portioner" />
+      <label class="modal-label">Kategori</label>
+      <input class="modal-input" id="recipe-tag-input" placeholder="t.ex. Pasta, Familj, Soppa..." />
+      <label class="modal-label">Ingredienser (en per rad)</label>
+      <textarea class="modal-textarea" id="recipe-ingredients-input" placeholder="200g pasta&#10;2 ägg&#10;100g parmesan&#10;guanciale"></textarea>
+      <label class="modal-label">Steg (ett per rad)</label>
+      <textarea class="modal-textarea" id="recipe-steps-input" placeholder="Koka pasta al dente&#10;Blanda ägg och ost&#10;Blanda allt utanför plattan"></textarea>
     </div>
 
-    <button class="modal-save-btn" id="modal-save-btn">Save Recipe</button>
+    <button class="modal-save-btn" id="modal-save-btn">Spara recept</button>
   </div>
 </div>
 
@@ -931,19 +949,19 @@
   <div class="detail-top">
     <button class="detail-back" id="detail-back">←</button>
     <div style="display:flex;gap:8px;align-items:center;">
-      <button class="detail-add-grocery" id="detail-add-grocery">+ Grocery list</button>
-      <button class="detail-add-grocery" id="detail-cook-btn" style="background:var(--orange);color:#fff;">👨‍🍳 Cook</button>
+      <button class="detail-add-grocery" id="detail-add-grocery">+ Inköpslista</button>
+      <button class="detail-add-grocery" id="detail-cook-btn" style="background:var(--orange);color:#fff;">👨‍🍳 Laga</button>
     </div>
   </div>
   <div class="detail-hero" id="detail-emoji"></div>
   <div class="detail-name" id="detail-name"></div>
   <div class="detail-meta" id="detail-meta"></div>
   <div class="detail-section">
-    <div class="detail-section-title">Ingredients</div>
+    <div class="detail-section-title">Ingredienser</div>
     <div id="detail-ingredients"></div>
   </div>
   <div class="detail-section">
-    <div class="detail-section-title">Steps</div>
+    <div class="detail-section-title">Steg</div>
     <div class="detail-steps" id="detail-steps"></div>
   </div>
 </div>
@@ -964,7 +982,7 @@
   <div class="cooking-body" id="cooking-body">
     <!-- Left: ingredients -->
     <div class="cooking-ingredients-panel">
-      <div class="cooking-panel-label">Ingredients</div>
+      <div class="cooking-panel-label">Ingredienser</div>
       <div id="cooking-ingredients-list"></div>
     </div>
 
@@ -976,8 +994,8 @@
         <div class="cooking-step-text" id="cooking-step-text"></div>
       </div>
       <div class="cooking-nav-row">
-        <button class="cooking-nav-btn" id="cooking-prev">← Prev</button>
-        <button class="cooking-nav-btn next" id="cooking-next">Next →</button>
+        <button class="cooking-nav-btn" id="cooking-prev">← Föregående</button>
+        <button class="cooking-nav-btn next" id="cooking-next">Nästa →</button>
       </div>
     </div>
   </div>
@@ -985,9 +1003,9 @@
   <!-- Done screen -->
   <div class="cooking-done" id="cooking-done">
     <div class="cooking-done-emoji">🎉</div>
-    <div class="cooking-done-title">Enjoy your meal!</div>
+    <div class="cooking-done-title">Smaklig måltid!</div>
     <div class="cooking-done-sub" id="cooking-done-sub"></div>
-    <button class="cooking-done-btn" id="cooking-done-btn">Back to recipe</button>
+    <button class="cooking-done-btn" id="cooking-done-btn">Tillbaka till receptet</button>
   </div>
 </div>
 
@@ -1033,6 +1051,31 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
+// ── CATEGORY DETECTION ──
+const CATEGORIES = [
+  { key: 'produce',   label: '🥦 Frukt & Grönt',  words: ['apple','äpple','banana','banan','orange','apelsin','lemon','citron','lime','grape','vindruv','strawberr','jordgubb','blueberr','blåbär','raspberr','hallon','mango','peach','persika','pear','päron','plum','plommon','melon','watermelon','vattenmelon','avocado','avokado','tomato','tomat','potato','potatis','carrot','morot','onion','lök','garlic','vitlök','ginger','ingefära','broccoli','spinach','spenat','lettuce','sallad','kale','grönkål','cucumber','gurka','zucchini','squash','pepper','paprika','chilli','mushroom','svamp','celery','selleri','corn','majs','leek','purjolök','asparagus','sparris','cauliflower','blomkål','cabbage','kål','beet','rödbeta','radish','rädisa','artichoke','herbs','örter','basil','basilika','parsley','persilja','cilantro','koriander','mint','mynta','dill','thyme','timjan','rosemary','rosmarin','sage','salvia','fruit','frukt','vegetable','grönsak','berries','bär','rödbeta','palsternacka','parsnip'] },
+  { key: 'dairy',     label: '🥛 Mejeri',           words: ['milk','mjölk','cheese','ost','yogurt','yoghurt','butter','smör','cream','grädde','sour cream','gräddfil','crème','cheddar','mozzarella','parmesan','brie','feta','cottage','ricotta','kefir','egg','eggs','ägg','kvarg','filmjölk','kesella'] },
+  { key: 'meat',      label: '🥩 Kött & Fisk',      words: ['chicken','kyckling','beef','nötkött','pork','fläsk','lamb','lamm','turkey','kalkon','duck','anka','bacon','sausage','korv','mince','köttfärs','steak','biff','fillet','filé','salmon','lax','tuna','tonfisk','shrimp','räkor','prawn','cod','torsk','fish','fisk','seafood','skaldjur','ham','skinka','salami','pepperoni','köttbullar','falukorv','sidfläsk','makrill'] },
+  { key: 'bakery',    label: '🍞 Bageri',            words: ['bread','bröd','baguette','roll','bulle','bagel','muffin','croissant','pita','wrap','tortilla','cracker','knäckebröd','cake','kaka','bun','sourdough','surdeg','rye','råg','scone','wienerbröd','kanelbulle'] },
+  { key: 'frozen',    label: '🧊 Fryst',             words: ['frozen','fryst','ice cream','glass','gelato','sorbet','popsicle','pinnglass'] },
+  { key: 'drinks',    label: '🥤 Drycker',           words: ['water','vatten','juice','soda','läsk','cola','beer','öl','wine','vin','coffee','kaffe','tea','te','oat milk','havremjölk','almond milk','mandelmjölk','coconut milk','kokosmjölk','smoothie','lemonade','lemonad','sparkling','kombucha','energy drink','energidryck','cider','saft'] },
+  { key: 'pantry',    label: '🥫 Skafferi',          words: ['pasta','rice','ris','noodle','nudlar','flour','mjöl','sugar','socker','salt','pepper','oil','olja','vinegar','vinäger','sauce','sås','ketchup','mustard','senap','mayonnaise','majonnäs','honey','honung','jam','sylt','peanut butter','jordnötssmör','canned','konserv','tin','soup','soppa','stock','buljong','broth','cereal','flingor','oat','havre','granola','nut','nötter','almond','mandel','walnut','valnöt','cashew','seed','frön','lentil','linser','bean','bönor','chickpea','kikärtor','spice','krydda','cumin','spiskummin','paprika','cinnamon','kanel','vanilla','vanilj','baking','bakning','soy sauce','sojasås','olive oil','olivolja','coconut oil','kokosolja','tomatkross','tomatpuré','maizena'] },
+  { key: 'household', label: '🧴 Hushåll',           words: ['soap','tvål','shampoo','schampo','conditioner','balsam','toothpaste','tandkräm','toilet','toalett','paper towel','hushållspapper','tissue','näsduk','detergent','diskmedel','washing','tvättmedel','dish','disk','sponge','svamp','bin bag','soppåse','trash bag','foil','plastfolie','cling','plastic bag','plastpåse','candle','ljus','battery','batteri','lightbulb','glödlampa','cleaning','rengöring','städ','wc-papper','toalettpapper'] },
+];
+
+function categorize(name) {
+  const lower = name.toLowerCase();
+  for (const cat of CATEGORIES) {
+    if (cat.words.some(w => lower.includes(w))) return cat.key;
+  }
+  return 'other';
+}
+
+function getCategoryLabel(key) {
+  const cat = CATEGORIES.find(c => c.key === key);
+  return cat ? cat.label : '🛍️ Övrigt';
+}
+
 // ── GROCERY ──
 function renderGrocery() {
   const list = document.getElementById('grocery-list');
@@ -1041,10 +1084,30 @@ function renderGrocery() {
   const clearBtn = document.getElementById('clear-checked');
   const unchecked = groceryItems.filter(i => !i.checked);
   const checked = groceryItems.filter(i => i.checked);
-  count.textContent = groceryItems.length + ' item' + (groceryItems.length !== 1 ? 's' : '');
+  count.textContent = groceryItems.length + (groceryItems.length !== 1 ? ' varor' : ' vara');
   list.innerHTML = '';
 
-  [...unchecked, ...checked].forEach(item => {
+  // Group unchecked items by category
+  const groups = {};
+  unchecked.forEach(item => {
+    const cat = item.category || categorize(item.name);
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
+  });
+
+  // Render unchecked items grouped by category
+  Object.entries(groups).forEach(([cat, items]) => {
+    const header = document.createElement('div');
+    header.className = 'grocery-category-header';
+    header.textContent = getCategoryLabel(cat);
+    list.appendChild(header);
+    items.forEach(item => appendGroceryItem(list, item));
+  });
+
+  // Render checked items flat at the bottom
+  checked.forEach(item => appendGroceryItem(list, item));
+
+  function appendGroceryItem(list, item) {
     const el = document.createElement('div');
     el.className = 'grocery-item' + (item.checked ? ' checked' : '');
     el.innerHTML = `
@@ -1062,11 +1125,14 @@ function renderGrocery() {
       }
     });
     list.appendChild(el);
-  });
+  }
 
   const hasChecked = checked.length > 0;
+  const isEmpty = groceryItems.length === 0;
   divider.style.display = hasChecked ? 'block' : 'none';
   clearBtn.style.display = hasChecked ? 'block' : 'none';
+  document.getElementById('grocery-empty').style.display = isEmpty ? 'block' : 'none';
+  document.getElementById('grocery-section-label').style.display = isEmpty ? 'none' : 'block';
 }
 
 document.getElementById('grocery-add-btn').addEventListener('click', addGroceryItem);
@@ -1076,7 +1142,7 @@ function addGroceryItem() {
   const input = document.getElementById('grocery-input');
   const val = input.value.trim();
   if (!val) return;
-  groceryItems.push({ id: Date.now(), name: val, checked: false });
+  groceryItems.push({ id: Date.now(), name: val, checked: false, category: categorize(val) });
   input.value = '';
   saveGrocery();
   renderGrocery();
@@ -1092,7 +1158,7 @@ function renderRecipes() {
   const list = document.getElementById('recipe-list');
   const count = document.getElementById('recipe-count');
   const search = document.getElementById('recipe-search').value.toLowerCase();
-  count.textContent = recipes.length + ' recipe' + (recipes.length !== 1 ? 's' : '') + ' saved';
+  count.textContent = recipes.length + (recipes.length !== 1 ? ' recept sparade' : ' recept sparat');
   list.innerHTML = '';
 
   const filtered = recipes.filter(r => {
@@ -1170,7 +1236,7 @@ document.getElementById('detail-add-grocery').addEventListener('click', () => {
   }));
   groceryItems.push(...newItems);
   saveGrocery();
-  showToast(`${newItems.length} ingredients added to grocery list 🛒`);
+  showToast(`${newItems.length} ingredienser tillagda i inköpslistan 🛒`);
   document.getElementById('detail-modal').classList.remove('open');
   switchTab('grocery');
   renderGrocery();
@@ -1188,7 +1254,7 @@ document.getElementById('add-modal').addEventListener('click', e => {
 
 document.getElementById('modal-save-btn').addEventListener('click', () => {
   const name = document.getElementById('recipe-name-input').value.trim();
-  if (!name) { showToast('Please add a recipe name'); return; }
+  if (!name) { showToast('Lägg till ett receptnamn'); return; }
   const recipe = {
     id: Date.now(),
     name,
@@ -1203,7 +1269,7 @@ document.getElementById('modal-save-btn').addEventListener('click', () => {
   renderRecipes();
   document.getElementById('add-modal').classList.remove('open');
   ['recipe-name-input','recipe-emoji-input','recipe-meta-input','recipe-tag-input','recipe-ingredients-input','recipe-steps-input'].forEach(id => document.getElementById(id).value = '');
-  showToast('Recipe saved! 🎉');
+  showToast('Recept sparat! 🎉');
 });
 
 // ── COOKING MODE ──
