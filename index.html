@@ -1700,7 +1700,7 @@ document.getElementById('household-submit').addEventListener('click', async () =
     const { data: household, error } = await db.from('households')
       .insert({ name: input, invite_code: inviteCode })
       .select().single();
-    if (error) { errorEl.textContent = 'Något gick fel, försök igen'; btn.textContent = 'Skapa hushåll'; btn.disabled = false; return; }
+    if (error) { errorEl.textContent = error.message; btn.textContent = 'Skapa hushåll'; btn.disabled = false; return; }
     await db.from('household_members').insert({ household_id: household.id, user_id: currentUser.id, role: 'owner' });
     currentHousehold = household;
   } else {
