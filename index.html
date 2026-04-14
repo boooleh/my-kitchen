@@ -1651,21 +1651,27 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
 
 // Check if user already belongs to a household
 async function checkHousehold() {
-  const { data } = await db.from('household_members')
-    .select('households(id, name, invite_code)')
+  const { data: membership } = await db.from('household_members')
+    .select('household_id')
     .eq('user_id', currentUser.id)
     .maybeSingle();
 
-  if (data?.households) {
-    currentHousehold = data.households;
-    updateAccountPanel();
-    hideAuthScreens();
-    switchTab('grocery');
-    renderGrocery();
-    renderRecipes();
-  } else {
-    showHouseholdScreen();
+  if (membership?.household_id) {
+    const { data: household } = await db.from('households')
+      .select('id, name, invite_code')
+      .eq('id', membership.household_id)
+      .maybeSingle();
+    if (household) {
+      currentHousehold = household;
+      updateAccountPanel();
+      hideAuthScreens();
+      switchTab('grocery');
+      renderGrocery();
+      renderRecipes();
+      return;
+    }
   }
+  showHouseholdScreen();
 }
 
 // Household option selection
