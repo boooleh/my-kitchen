@@ -848,9 +848,198 @@
     pointer-events: none;
   }
   .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── AUTH SCREEN ── */
+  .auth-screen {
+    position: fixed; inset: 0;
+    background: var(--white);
+    z-index: 500;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 24px;
+    animation: fadeIn 0.3s var(--ease-out);
+  }
+  .auth-screen.hidden { display: none; }
+  .auth-logo {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700; font-size: 1.4rem;
+    color: var(--black);
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .auth-tagline { font-size: 0.85rem; color: var(--gray-4); margin-bottom: 40px; text-align: center; }
+  .auth-tabs {
+    display: flex;
+    background: var(--gray-1);
+    border-radius: 14px; padding: 4px;
+    width: 100%; max-width: 340px;
+    margin-bottom: 24px;
+  }
+  .auth-tab {
+    flex: 1; padding: 9px; border: none;
+    border-radius: 11px; background: transparent;
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.82rem; font-weight: 700;
+    color: var(--gray-4); cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+  }
+  .auth-tab.active { background: var(--white); color: var(--black); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .auth-form { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 12px; }
+  .auth-input {
+    width: 100%; background: var(--gray-1); border: none;
+    border-radius: var(--radius-sm); padding: 14px 16px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.9rem; color: var(--black); outline: none;
+    transition: background 0.2s;
+  }
+  .auth-input:focus { background: var(--gray-2); }
+  .auth-input::placeholder { color: var(--gray-3); }
+  .auth-btn {
+    width: 100%; padding: 15px;
+    background: var(--orange); border: none;
+    border-radius: var(--radius-md);
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700; font-size: 1rem; color: #fff;
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-spring), background 0.15s;
+    margin-top: 4px;
+  }
+  .auth-btn:hover { transform: scale(1.02); background: #e85a24; }
+  .auth-error { font-size: 0.8rem; color: #e85a24; text-align: center; min-height: 20px; }
+
+  /* ── HOUSEHOLD SETUP ── */
+  .household-screen {
+    position: fixed; inset: 0;
+    background: var(--white);
+    z-index: 400;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 24px;
+    animation: fadeIn 0.3s var(--ease-out);
+  }
+  .household-screen.hidden { display: none; }
+  .household-title { font-family: 'Raleway', sans-serif; font-weight: 700; font-size: 1.4rem; color: var(--black); margin-bottom: 8px; text-align: center; }
+  .household-sub { font-size: 0.85rem; color: var(--gray-4); margin-bottom: 36px; text-align: center; }
+  .household-options { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 340px; }
+  .household-option {
+    background: var(--gray-1); border: none;
+    border-radius: var(--radius-md); padding: 20px;
+    text-align: left; cursor: pointer;
+    transition: background 0.2s, transform 0.2s var(--ease-spring);
+  }
+  .household-option:hover { background: var(--gray-2); transform: scale(1.02); }
+  .household-option.selected { background: var(--orange-light); }
+  .household-option-title { font-family: 'Raleway', sans-serif; font-weight: 700; font-size: 0.95rem; color: var(--black); margin-bottom: 4px; }
+  .household-option-desc { font-size: 0.8rem; color: var(--gray-4); }
+  .household-form { width: 100%; max-width: 340px; margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* ── ACCOUNT PANEL ── */
+  .account-panel {
+    position: fixed; inset: 0; z-index: 450;
+    display: none; align-items: flex-end; justify-content: center;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+  }
+  .account-panel.open { display: flex; }
+  .account-sheet {
+    background: var(--white);
+    border-radius: 28px 28px 0 0;
+    padding: 28px 24px 40px;
+    width: 100%; max-width: 430px;
+    animation: slideUp 0.4s var(--ease-spring);
+  }
+  .account-handle { width: 36px; height: 4px; background: var(--gray-2); border-radius: 2px; margin: 0 auto 24px; }
+  .account-title { font-family: 'Raleway', sans-serif; font-weight: 700; font-size: 1.1rem; color: var(--black); margin-bottom: 20px; }
+  .account-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--gray-2); }
+  .account-row:last-of-type { border-bottom: none; }
+  .account-row-label { font-size: 0.78rem; color: var(--gray-4); margin-bottom: 3px; }
+  .account-row-value { font-size: 0.92rem; font-weight: 600; color: var(--black); }
+  .account-invite-code { font-family: monospace; font-size: 1.3rem; font-weight: 700; color: var(--orange); letter-spacing: 0.15em; cursor: pointer; }
+  .account-signout {
+    width: 100%; padding: 14px;
+    background: var(--gray-1); border: none;
+    border-radius: var(--radius-md);
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700; font-size: 0.9rem; color: var(--gray-4);
+    cursor: pointer; margin-top: 16px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .account-signout:hover { background: var(--gray-2); color: var(--black); }
 </style>
 </head>
 <body>
+
+<!-- AUTH SCREEN -->
+<div class="auth-screen hidden" id="auth-screen">
+  <div class="auth-logo"><span class="logo-dot"></span> Mitt Kök</div>
+  <div class="auth-tagline">Mat för hela familjen</div>
+  <div class="auth-tabs">
+    <button class="auth-tab active" id="auth-tab-signin">Logga in</button>
+    <button class="auth-tab" id="auth-tab-signup">Skapa konto</button>
+  </div>
+  <div class="auth-form">
+    <input class="auth-input" id="auth-email" type="email" placeholder="E-postadress" autocomplete="email" />
+    <div style="position:relative; width:100%;">
+      <input class="auth-input" id="auth-password" type="password" placeholder="Lösenord" autocomplete="current-password" style="width:100%; padding-right:48px;" />
+      <button id="toggle-password" type="button" style="position:absolute; right:14px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--gray-3); padding:4px; display:flex; align-items:center;">
+        <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+    <div class="auth-error" id="auth-error"></div>
+    <button class="auth-btn" id="auth-submit">Logga in</button>
+  </div>
+</div>
+
+<!-- HOUSEHOLD SETUP SCREEN -->
+<div class="household-screen hidden" id="household-screen">
+  <div style="font-size:2.5rem;margin-bottom:16px;">🏠</div>
+  <div class="household-title">Välkommen!</div>
+  <div class="household-sub">Skapa ett hushåll eller gå med i ett befintligt</div>
+  <div class="household-options">
+    <button class="household-option" id="opt-create">
+      <div class="household-option-title">🏠 Skapa hushåll</div>
+      <div class="household-option-desc">Starta ett nytt hushåll och bjud in din partner</div>
+    </button>
+    <button class="household-option" id="opt-join">
+      <div class="household-option-title">🔗 Gå med i hushåll</div>
+      <div class="household-option-desc">Använd en inbjudningskod från din partner</div>
+    </button>
+  </div>
+  <div class="household-form" id="household-form" style="display:none;">
+    <input class="auth-input" id="household-input" placeholder="" />
+    <div class="auth-error" id="household-error"></div>
+    <button class="auth-btn" id="household-submit">Fortsätt</button>
+  </div>
+</div>
+
+<!-- ACCOUNT PANEL -->
+<div class="account-panel" id="account-panel">
+  <div class="account-sheet">
+    <div class="account-handle"></div>
+    <div class="account-title">Mitt konto</div>
+    <div class="account-row">
+      <div>
+        <div class="account-row-label">E-post</div>
+        <div class="account-row-value" id="account-email">—</div>
+      </div>
+    </div>
+    <div class="account-row">
+      <div>
+        <div class="account-row-label">Hushåll</div>
+        <div class="account-row-value" id="account-household">—</div>
+      </div>
+    </div>
+    <div class="account-row">
+      <div>
+        <div class="account-row-label">Inbjudningskod — tryck för att kopiera</div>
+        <div class="account-invite-code" id="account-invite-code">——</div>
+      </div>
+    </div>
+    <button class="account-signout" id="account-signout">Logga ut</button>
+  </div>
+</div>
 
 <div class="app">
 
@@ -1384,9 +1573,198 @@ document.getElementById('cooking-done-btn').addEventListener('click', () => {
 });
 
 
+// ── AUTH & HOUSEHOLD FLOW ──
+let currentUser = null;
+let currentHousehold = null;
+let authMode = 'signin'; // 'signin' or 'signup'
+let householdMode = null; // 'create' or 'join'
+
+function showAuthScreen() {
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('household-screen').classList.add('hidden');
+}
+
+function showHouseholdScreen() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('household-screen').classList.remove('hidden');
+}
+
+function hideAuthScreens() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('household-screen').classList.add('hidden');
+}
+
+// Toggle password visibility
+document.getElementById('toggle-password').addEventListener('click', () => {
+  const input = document.getElementById('auth-password');
+  const icon = document.getElementById('eye-icon');
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  icon.innerHTML = isHidden
+    ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>`
+    : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+});
+
+// Switch between login and signup tabs
+document.getElementById('auth-tab-signin').addEventListener('click', () => {
+  authMode = 'signin';
+  document.getElementById('auth-tab-signin').classList.add('active');
+  document.getElementById('auth-tab-signup').classList.remove('active');
+  document.getElementById('auth-submit').textContent = 'Logga in';
+  document.getElementById('auth-error').textContent = '';
+});
+
+document.getElementById('auth-tab-signup').addEventListener('click', () => {
+  authMode = 'signup';
+  document.getElementById('auth-tab-signup').classList.add('active');
+  document.getElementById('auth-tab-signin').classList.remove('active');
+  document.getElementById('auth-submit').textContent = 'Skapa konto';
+  document.getElementById('auth-error').textContent = '';
+});
+
+// Submit login or signup
+document.getElementById('auth-submit').addEventListener('click', async () => {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errorEl = document.getElementById('auth-error');
+  errorEl.textContent = '';
+
+  if (!email || !password) { errorEl.textContent = 'Fyll i e-post och lösenord'; return; }
+
+  const btn = document.getElementById('auth-submit');
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  if (authMode === 'signup') {
+    const { data, error } = await db.auth.signUp({ email, password });
+    if (error) { errorEl.textContent = error.message; btn.textContent = 'Skapa konto'; btn.disabled = false; return; }
+    currentUser = data.user;
+  } else {
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) { errorEl.textContent = 'Fel e-post eller lösenord'; btn.textContent = 'Logga in'; btn.disabled = false; return; }
+    currentUser = data.user;
+  }
+
+  await checkHousehold();
+  btn.disabled = false;
+});
+
+// Check if user already belongs to a household
+async function checkHousehold() {
+  const { data } = await db.from('household_members')
+    .select('households(id, name, invite_code)')
+    .eq('user_id', currentUser.id)
+    .maybeSingle();
+
+  if (data?.households) {
+    currentHousehold = data.households;
+    updateAccountPanel();
+    hideAuthScreens();
+    switchTab('grocery');
+    renderGrocery();
+    renderRecipes();
+  } else {
+    showHouseholdScreen();
+  }
+}
+
+// Household option selection
+function selectHouseholdOption(mode) {
+  householdMode = mode;
+  document.getElementById('opt-create').classList.toggle('selected', mode === 'create');
+  document.getElementById('opt-join').classList.toggle('selected', mode === 'join');
+  const form = document.getElementById('household-form');
+  const input = document.getElementById('household-input');
+  form.style.display = 'flex';
+  input.placeholder = mode === 'create' ? 'Namn på ert hushåll' : 'Inbjudningskod';
+  input.value = '';
+  document.getElementById('household-error').textContent = '';
+  document.getElementById('household-submit').textContent = mode === 'create' ? 'Skapa hushåll' : 'Gå med';
+}
+
+document.getElementById('opt-create').addEventListener('click', () => selectHouseholdOption('create'));
+document.getElementById('opt-join').addEventListener('click', () => selectHouseholdOption('join'));
+
+// Submit household creation or joining
+document.getElementById('household-submit').addEventListener('click', async () => {
+  const input = document.getElementById('household-input').value.trim();
+  const errorEl = document.getElementById('household-error');
+  errorEl.textContent = '';
+  if (!input) { errorEl.textContent = 'Fyll i fältet ovan'; return; }
+
+  const btn = document.getElementById('household-submit');
+  btn.textContent = '...'; btn.disabled = true;
+
+  if (householdMode === 'create') {
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const { data: household, error } = await db.from('households')
+      .insert({ name: input, invite_code: inviteCode })
+      .select().single();
+    if (error) { errorEl.textContent = 'Något gick fel, försök igen'; btn.textContent = 'Skapa hushåll'; btn.disabled = false; return; }
+    await db.from('household_members').insert({ household_id: household.id, user_id: currentUser.id, role: 'owner' });
+    currentHousehold = household;
+  } else {
+    const { data: household, error } = await db.from('households')
+      .select().eq('invite_code', input.toUpperCase()).maybeSingle();
+    if (error || !household) { errorEl.textContent = 'Ogiltig inbjudningskod'; btn.textContent = 'Gå med'; btn.disabled = false; return; }
+    await db.from('household_members').insert({ household_id: household.id, user_id: currentUser.id, role: 'member' });
+    currentHousehold = household;
+  }
+
+  updateAccountPanel();
+  hideAuthScreens();
+  switchTab('grocery');
+  renderGrocery();
+  renderRecipes();
+  btn.disabled = false;
+});
+
+// Account panel
+function updateAccountPanel() {
+  if (!currentUser || !currentHousehold) return;
+  document.getElementById('account-email').textContent = currentUser.email;
+  document.getElementById('account-household').textContent = currentHousehold.name;
+  document.getElementById('account-invite-code').textContent = currentHousehold.invite_code;
+}
+
+document.querySelector('.avatar-btn').addEventListener('click', () => {
+  document.getElementById('account-panel').classList.add('open');
+});
+
+document.getElementById('account-panel').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('account-panel')) {
+    document.getElementById('account-panel').classList.remove('open');
+  }
+});
+
+document.getElementById('account-invite-code').addEventListener('click', () => {
+  navigator.clipboard.writeText(currentHousehold?.invite_code || '');
+  showToast('Inbjudningskod kopierad! 📋');
+});
+
+document.getElementById('account-signout').addEventListener('click', async () => {
+  await db.auth.signOut();
+  currentUser = null;
+  currentHousehold = null;
+  document.getElementById('account-panel').classList.remove('open');
+  showAuthScreen();
+});
+
+// Init — check if already logged in
+async function initApp() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session?.user) {
+    currentUser = session.user;
+    await checkHousehold();
+  } else {
+    showAuthScreen();
+  }
+}
+
 switchTab('grocery');
 renderGrocery();
 renderRecipes();
+initApp();
 </script>
 </body>
 </html>
