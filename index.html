@@ -472,6 +472,32 @@
     margin-top: 6px;
   }
   .modal-save-btn:hover { transform: scale(1.02); background: #e85a24; }
+  .modal-save-btn:disabled { background: var(--gray-3); cursor: default; transform: none; }
+
+  /* ── INGREDIENT PICKER ── */
+  .ing-pick-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 4px;
+    border-bottom: 1px solid var(--gray-2);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .ing-pick-item:last-child { border-bottom: none; }
+  .ing-pick-check {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 1.5px solid var(--gray-3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem;
+    color: #fff;
+    flex-shrink: 0;
+    transition: all 0.2s var(--ease-spring);
+  }
+  .ing-pick-check.active { background: var(--orange); border-color: var(--orange); }
+  .ing-pick-name { font-size: 0.9rem; color: var(--black); transition: color 0.15s; }
+  .ing-pick-item.deselected .ing-pick-name { color: var(--gray-3); text-decoration: line-through; }
 
   /* ── RECIPE DETAIL MODAL ── */
   .detail-modal {
@@ -1203,13 +1229,23 @@
   </div>
 </div>
 
+<!-- INGREDIENT PICKER MODAL -->
+<div class="modal-overlay" id="ingredient-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Välj ingredienser</div>
+    <div id="ingredient-pick-list"></div>
+    <button class="modal-save-btn" id="ingredient-add-btn">Lägg till i inköpslistan</button>
+  </div>
+</div>
+
 <!-- COOKING MODE -->
 <div class="cooking-modal" id="cooking-modal">
   <div class="cooking-rotate-prompt">
-    <button class="cooking-close" onclick="closeCookingMode()" style="position:absolute;top:16px;right:16px;">✕</button>
     <div class="cooking-rotate-icon">📱</div>
     <div class="cooking-rotate-text">Rotera telefonen</div>
     <div class="cooking-rotate-sub">Liggande läge ger bäst upplevelse</div>
+    <button onclick="closeCookingMode()" style="margin-top:32px;padding:14px 32px;background:var(--orange);color:#fff;border:none;border-radius:50px;font-family:'Raleway',sans-serif;font-weight:800;font-size:1rem;cursor:pointer;">Stäng</button>
   </div>
   <div class="cooking-header">
     <div class="cooking-title-row">
@@ -1573,9 +1609,42 @@ document.getElementById('detail-back').addEventListener('click', () => {
   document.getElementById('detail-modal').classList.remove('open');
 });
 
-document.getElementById('detail-add-grocery').addEventListener('click', async () => {
+// ── INGREDIENT PICKER ──
+let ingredientSelection = [];
+
+document.getElementById('detail-add-grocery').addEventListener('click', () => {
   if (!currentRecipe) return;
-  const rows = (currentRecipe.ingredients || []).map(ing => ({
+  ingredientSelection = (currentRecipe.ingredients || []).map(() => true); // all selected by default
+  renderIngredientPicker();
+  document.getElementById('ingredient-modal').classList.add('open');
+});
+
+function renderIngredientPicker() {
+  const list = document.getElementById('ingredient-pick-list');
+  list.innerHTML = '';
+  (currentRecipe.ingredients || []).forEach((ing, idx) => {
+    const el = document.createElement('div');
+    el.className = 'ing-pick-item' + (ingredientSelection[idx] ? '' : ' deselected');
+    el.innerHTML = `
+      <div class="ing-pick-check ${ingredientSelection[idx] ? 'active' : ''}">${ingredientSelection[idx] ? '✓' : ''}</div>
+      <span class="ing-pick-name">${ing}</span>
+    `;
+    el.addEventListener('click', () => {
+      ingredientSelection[idx] = !ingredientSelection[idx];
+      renderIngredientPicker();
+    });
+    list.appendChild(el);
+  });
+  const count = ingredientSelection.filter(Boolean).length;
+  const btn = document.getElementById('ingredient-add-btn');
+  btn.disabled = count === 0;
+  btn.textContent = count === 0 ? 'Välj minst en ingrediens' : `Lägg till ${count} ${count === 1 ? 'ingrediens' : 'ingredienser'}`;
+}
+
+document.getElementById('ingredient-add-btn').addEventListener('click', async () => {
+  const selected = (currentRecipe.ingredients || []).filter((_, idx) => ingredientSelection[idx]);
+  if (selected.length === 0) return;
+  const rows = selected.map(ing => ({
     grocery_list_id: currentGroceryListId,
     name: ing,
     checked: false,
@@ -1583,14 +1652,19 @@ document.getElementById('detail-add-grocery').addEventListener('click', async ()
   }));
   const { error } = await db.from('grocery_items').insert(rows);
   if (error) {
-    console.error('Error adding ingredients:', error.message);
     showToast('Kunde inte lägga till ingredienser 😕');
   } else {
     showToast(`${rows.length} ingredienser tillagda i inköpslistan 🛒`);
+    document.getElementById('ingredient-modal').classList.remove('open');
     document.getElementById('detail-modal').classList.remove('open');
     switchTab('grocery');
   }
-  // Real-time subscription handles rendering the new items
+});
+
+document.getElementById('ingredient-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('ingredient-modal')) {
+    document.getElementById('ingredient-modal').classList.remove('open');
+  }
 });
 
 // ── ADD RECIPE MODAL ──
@@ -1657,7 +1731,7 @@ function openCookingMode(recipe) {
   document.getElementById('cooking-modal').classList.add('open');
   renderCookingStep(recipe);
 
-  // Lock to landscape (works when installed as PWA)
+  // Orientation lock requires https — will work once deployed to Netlify/GitHub Pages
   screen.orientation?.lock('landscape').catch(() => {});
 }
 
