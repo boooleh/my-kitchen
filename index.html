@@ -1076,7 +1076,7 @@
         <div class="grocery-sub" id="grocery-count">0 varor</div>
       </div>
       <div class="grocery-add">
-        <input class="grocery-input" id="grocery-input" placeholder="Lägg till en vara..." />
+        <input class="grocery-input" id="grocery-input" type="text" autocomplete="off" autocorrect="off" placeholder="Lägg till en vara..." />
         <button class="add-btn" id="grocery-add-btn">+</button>
       </div>
       <div class="section-label" id="grocery-section-label">Varor</div>
@@ -1255,19 +1255,21 @@ let currentGroceryListId = null;
 
 async function getOrCreateGroceryList() {
   // Look for an existing grocery list for this household
-  const { data: existing } = await db
+  const { data: existing, error: selectError } = await db
     .from('grocery_lists')
     .select('id')
     .eq('household_id', currentHousehold.id)
     .maybeSingle();
+  if (selectError) console.error('Error finding grocery list:', selectError.message);
   if (existing) return existing.id;
 
   // None found — create one automatically
-  const { data: created } = await db
+  const { data: created, error: insertError } = await db
     .from('grocery_lists')
-    .insert({ household_id: currentHousehold.id })
+    .insert({ household_id: currentHousehold.id, name: 'Inköpslista' })
     .select('id')
     .single();
+  if (insertError) console.error('Error creating grocery list:', insertError.message);
   return created?.id || null;
 }
 
@@ -1423,13 +1425,29 @@ async function addGroceryItem() {
   const val = input.value.trim();
   if (!val) return;
   input.value = '';
+
+  // If we don't have a list ID yet, try to get one now
+  if (!currentGroceryListId) {
+    console.warn('currentGroceryListId is null — retrying getOrCreateGroceryList...');
+    currentGroceryListId = await getOrCreateGroceryList();
+  }
+  if (!currentGroceryListId) {
+    console.error('Still no grocery list ID. Cannot add item.');
+    showToast('Kunde inte hitta inköpslistan 😕');
+    return;
+  }
+
+  console.log('Inserting item — list ID:', currentGroceryListId, '| user:', currentUser?.id);
   const { data, error } = await db.from('grocery_items').insert({
     grocery_list_id: currentGroceryListId,
     name: val,
     checked: false,
     category: categorize(val)
   }).select().single();
-  if (!error && data) {
+  if (error) {
+    console.error('Error adding grocery item:', error.message);
+    showToast('Kunde inte lägga till vara 😕');
+  } else if (data) {
     groceryItems.push(data);
     renderGrocery();
   }
