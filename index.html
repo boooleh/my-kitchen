@@ -1701,7 +1701,7 @@ document.getElementById('modal-save-btn').addEventListener('click', () => {
 let cookingStep = 0;
 let cookingIngTicked = [];
 
-function openCookingMode(recipe) {
+async function openCookingMode(recipe) {
   cookingStep = 0;
   cookingIngTicked = new Array(recipe.ingredients.length).fill(false);
 
@@ -1731,8 +1731,13 @@ function openCookingMode(recipe) {
   document.getElementById('cooking-modal').classList.add('open');
   renderCookingStep(recipe);
 
-  // Lock to landscape
-  screen.orientation?.lock('landscape').catch(err => showToast('Lock failed: ' + err.message));
+  // Go fullscreen then lock to landscape
+  try {
+    await document.documentElement.requestFullscreen();
+    await screen.orientation.lock('landscape');
+  } catch(err) {
+    showToast('Lock failed: ' + err.message);
+  }
 }
 
 function renderCookingStep(recipe) {
@@ -1790,6 +1795,7 @@ document.getElementById('cooking-next').addEventListener('click', () => {
 function closeCookingMode() {
   document.getElementById('cooking-modal').classList.remove('open');
   screen.orientation?.unlock();
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
 
 document.getElementById('cooking-close').addEventListener('click', closeCookingMode);
