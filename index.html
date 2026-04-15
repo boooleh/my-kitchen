@@ -198,6 +198,7 @@
   .add-btn:hover { transform: scale(1.08); background: #e85a24; }
 
   .grocery-list { padding: 0 24px; display: flex; flex-direction: column; gap: 4px; }
+  .grocery-list.no-animate .grocery-item { animation: none; }
 
   .grocery-item {
     display: flex;
@@ -1379,11 +1380,11 @@ function subscribeToGrocery() {
       if (payload.eventType === 'INSERT') {
         if (!groceryItems.find(i => i.id === payload.new.id)) {
           groceryItems.push(payload.new);
-          renderGrocery();
+          addGroceryItemToDOM(payload.new);
         }
       } else if (payload.eventType === 'UPDATE') {
         const idx = groceryItems.findIndex(i => i.id === payload.new.id);
-        if (idx !== -1) { groceryItems[idx] = payload.new; renderGrocery(); }
+        if (idx !== -1) { groceryItems[idx] = payload.new; updateGroceryItemInDOM(payload.new); }
       } else if (payload.eventType === 'DELETE') {
         groceryItems = groceryItems.filter(i => i.id !== payload.old.id);
         renderGrocery();
@@ -1434,9 +1435,81 @@ function getCategoryLabel(key) {
   return cat ? cat.label : '🛍️ Övrigt';
 }
 
-// ── GROCERY ──
-function renderGrocery() {
+// ── GROCERY HELPERS ──
+function createGroceryElement(item) {
+  const el = document.createElement('div');
+  el.className = 'grocery-item' + (item.checked ? ' checked' : '');
+  el.dataset.id = item.id;
+  el.innerHTML = `
+    <div class="check-circle">${item.checked ? '✓' : ''}</div>
+    <div class="grocery-item-name">${item.name}</div>
+    <span class="grocery-item-del" data-id="${item.id}">✕</span>
+  `;
+  el.addEventListener('click', async (e) => {
+    const current = groceryItems.find(i => i.id === item.id);
+    if (!current) return;
+    if (e.target.classList.contains('grocery-item-del')) {
+      groceryItems = groceryItems.filter(i => i.id !== current.id);
+      el.remove();
+      cleanupEmptyCategories();
+      updateGroceryMeta();
+      await db.from('grocery_items').delete().eq('id', current.id);
+    } else {
+      await db.from('grocery_items').update({ checked: !current.checked }).eq('id', current.id);
+    }
+  });
+  return el;
+}
+
+function updateGroceryMeta() {
+  const hasChecked = groceryItems.some(i => i.checked);
+  const isEmpty = groceryItems.length === 0;
+  document.getElementById('grocery-count').textContent = groceryItems.length + (groceryItems.length !== 1 ? ' varor' : ' vara');
+  document.getElementById('grocery-divider').style.display = hasChecked ? 'block' : 'none';
+  document.getElementById('clear-checked').style.display = hasChecked ? 'block' : 'none';
+  document.getElementById('grocery-empty').style.display = isEmpty ? 'block' : 'none';
+  document.getElementById('grocery-section-label').style.display = isEmpty ? 'none' : 'block';
+}
+
+function cleanupEmptyCategories() {
+  document.querySelectorAll('.grocery-category-header').forEach(header => {
+    const next = header.nextElementSibling;
+    if (!next || next.classList.contains('grocery-category-header') || next.classList.contains('checked')) {
+      header.remove();
+    }
+  });
+}
+
+function addGroceryItemToDOM(item) {
   const list = document.getElementById('grocery-list');
+  const el = createGroceryElement(item);
+  const cat = item.category || categorize(item.name);
+  const catLabel = getCategoryLabel(cat);
+  let header = Array.from(list.querySelectorAll('.grocery-category-header'))
+    .find(h => h.textContent === catLabel);
+  if (!header) {
+    header = document.createElement('div');
+    header.className = 'grocery-category-header';
+    header.textContent = catLabel;
+    const firstChecked = list.querySelector('.grocery-item.checked');
+    firstChecked ? list.insertBefore(header, firstChecked) : list.appendChild(header);
+  }
+  let insertAfter = header;
+  while (insertAfter.nextSibling && insertAfter.nextSibling.dataset?.id && !insertAfter.nextSibling.classList?.contains('checked')) {
+    insertAfter = insertAfter.nextSibling;
+  }
+  insertAfter.insertAdjacentElement('afterend', el);
+  updateGroceryMeta();
+}
+
+// ── GROCERY ──
+function renderGrocery(skipAnimation = false) {
+  const list = document.getElementById('grocery-list');
+  if (skipAnimation) {
+    list.classList.add('no-animate');
+  } else {
+    list.classList.remove('no-animate');
+  }
   const count = document.getElementById('grocery-count');
   const divider = document.getElementById('grocery-divider');
   const clearBtn = document.getElementById('clear-checked');
@@ -1459,39 +1532,47 @@ function renderGrocery() {
     header.className = 'grocery-category-header';
     header.textContent = getCategoryLabel(cat);
     list.appendChild(header);
-    items.forEach(item => appendGroceryItem(list, item));
+    items.forEach(item => list.appendChild(createGroceryElement(item)));
   });
 
   // Render checked items flat at the bottom
-  checked.forEach(item => appendGroceryItem(list, item));
+  checked.forEach(item => list.appendChild(createGroceryElement(item)));
 
-  function appendGroceryItem(list, item) {
-    const el = document.createElement('div');
-    el.className = 'grocery-item' + (item.checked ? ' checked' : '');
-    el.innerHTML = `
-      <div class="check-circle">${item.checked ? '✓' : ''}</div>
-      <div class="grocery-item-name">${item.name}</div>
-      <span class="grocery-item-del" data-id="${item.id}">✕</span>
-    `;
-    el.addEventListener('click', async (e) => {
-      if (e.target.classList.contains('grocery-item-del')) {
-        groceryItems = groceryItems.filter(i => i.id !== item.id);
-        renderGrocery();
-        await db.from('grocery_items').delete().eq('id', item.id);
-      } else {
-        // Just update Supabase — real-time subscription handles the re-render
-        await db.from('grocery_items').update({ checked: !item.checked }).eq('id', item.id);
-      }
-    });
+  updateGroceryMeta();
+}
+
+function updateGroceryItemInDOM(item) {
+  const list = document.getElementById('grocery-list');
+  const el = list.querySelector(`.grocery-item[data-id="${item.id}"]`);
+  if (!el) { renderGrocery(true); return; }
+
+  el.classList.toggle('checked', item.checked);
+  el.querySelector('.check-circle').textContent = item.checked ? '✓' : '';
+
+  if (item.checked) {
+    // Move to end of list (checked section)
     list.appendChild(el);
+    cleanupEmptyCategories();
+  } else {
+    // Move back to its category group
+    const cat = item.category || categorize(item.name);
+    const catLabel = getCategoryLabel(cat);
+    let header = Array.from(list.querySelectorAll('.grocery-category-header'))
+      .find(h => h.textContent === catLabel);
+    if (header) {
+      let last = header;
+      while (last.nextSibling && last.nextSibling.dataset?.id && !last.nextSibling.classList?.contains('checked')) last = last.nextSibling;
+      last.insertAdjacentElement('afterend', el);
+    } else {
+      header = document.createElement('div');
+      header.className = 'grocery-category-header';
+      header.textContent = catLabel;
+      const firstChecked = list.querySelector('.grocery-item.checked');
+      if (firstChecked) { list.insertBefore(header, firstChecked); list.insertBefore(el, firstChecked); }
+      else { list.appendChild(header); list.appendChild(el); }
+    }
   }
-
-  const hasChecked = checked.length > 0;
-  const isEmpty = groceryItems.length === 0;
-  divider.style.display = hasChecked ? 'block' : 'none';
-  clearBtn.style.display = hasChecked ? 'block' : 'none';
-  document.getElementById('grocery-empty').style.display = isEmpty ? 'block' : 'none';
-  document.getElementById('grocery-section-label').style.display = isEmpty ? 'none' : 'block';
+  updateGroceryMeta();
 }
 
 document.getElementById('grocery-add-btn').addEventListener('click', addGroceryItem);
@@ -1519,11 +1600,8 @@ async function addGroceryItem() {
   if (error) {
     console.error('Error adding grocery item:', error.message);
     showToast('Kunde inte lägga till vara 😕');
-  } else if (data && !groceryItems.find(i => i.id === data.id)) {
-    // Add locally only if real-time hasn't already added it
-    groceryItems.push(data);
-    renderGrocery();
   }
+  // Real-time INSERT handler adds the item to the DOM
 }
 
 document.getElementById('clear-checked').addEventListener('click', async () => {
@@ -1739,9 +1817,7 @@ async function openCookingMode(recipe) {
     if (document.fullscreenElement) {
       try {
         await screen.orientation.lock('landscape');
-      } catch(err) {
-        showToast('Lock failed: ' + err.message);
-      }
+      } catch(err) {}
     }
   }, { once: true });
 }
