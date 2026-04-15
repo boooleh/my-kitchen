@@ -1251,12 +1251,34 @@ function saveRecipes() { localStorage.setItem('mk-recipes', JSON.stringify(recip
 
 // ── SUPABASE GROCERY SYNC ──
 let groceryChannel = null;
+let currentGroceryListId = null;
+
+async function getOrCreateGroceryList() {
+  // Look for an existing grocery list for this household
+  const { data: existing } = await db
+    .from('grocery_lists')
+    .select('id')
+    .eq('household_id', currentHousehold.id)
+    .maybeSingle();
+  if (existing) return existing.id;
+
+  // None found — create one automatically
+  const { data: created } = await db
+    .from('grocery_lists')
+    .insert({ household_id: currentHousehold.id })
+    .select('id')
+    .single();
+  return created?.id || null;
+}
 
 async function loadGrocery() {
+  currentGroceryListId = await getOrCreateGroceryList();
+  if (!currentGroceryListId) return;
+
   const { data, error } = await db
     .from('grocery_items')
     .select('*')
-    .eq('household_id', currentHousehold.id)
+    .eq('grocery_list_id', currentGroceryListId)
     .order('created_at', { ascending: true });
   if (!error) {
     groceryItems = data || [];
@@ -1266,12 +1288,12 @@ async function loadGrocery() {
 
 function subscribeToGrocery() {
   if (groceryChannel) groceryChannel.unsubscribe();
-  groceryChannel = db.channel('grocery-' + currentHousehold.id)
+  groceryChannel = db.channel('grocery-' + currentGroceryListId)
     .on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'grocery_items',
-      filter: `household_id=eq.${currentHousehold.id}`
+      filter: `grocery_list_id=eq.${currentGroceryListId}`
     }, (payload) => {
       if (payload.eventType === 'INSERT') {
         // Avoid duplicating items we already added optimistically
@@ -1402,7 +1424,7 @@ async function addGroceryItem() {
   if (!val) return;
   input.value = '';
   const { data, error } = await db.from('grocery_items').insert({
-    household_id: currentHousehold.id,
+    grocery_list_id: currentGroceryListId,
     name: val,
     checked: false,
     category: categorize(val)
@@ -1499,7 +1521,7 @@ document.getElementById('detail-back').addEventListener('click', () => {
 document.getElementById('detail-add-grocery').addEventListener('click', async () => {
   if (!currentRecipe) return;
   const rows = (currentRecipe.ingredients || []).map(ing => ({
-    household_id: currentHousehold.id,
+    grocery_list_id: currentGroceryListId,
     name: ing,
     checked: false,
     category: categorize(ing)
@@ -1836,6 +1858,7 @@ document.getElementById('account-signout').addEventListener('click', async () =>
   if (groceryChannel) { groceryChannel.unsubscribe(); groceryChannel = null; }
   currentUser = null;
   currentHousehold = null;
+  currentGroceryListId = null;
   groceryItems = [];
   document.getElementById('account-panel').classList.remove('open');
   showAuthScreen();
