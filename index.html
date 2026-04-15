@@ -1731,8 +1731,8 @@ function openCookingMode(recipe) {
   document.getElementById('cooking-modal').classList.add('open');
   renderCookingStep(recipe);
 
-  // Orientation lock requires https — will work once deployed to Netlify/GitHub Pages
-  screen.orientation?.lock('landscape').catch(() => {});
+  // Lock to landscape
+  screen.orientation?.lock('landscape').catch(err => console.error('Orientation lock failed:', err.message));
 }
 
 function renderCookingStep(recipe) {
