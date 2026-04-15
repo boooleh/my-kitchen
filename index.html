@@ -1438,19 +1438,17 @@ async function addGroceryItem() {
   }
 
   console.log('Inserting item — list ID:', currentGroceryListId, '| user:', currentUser?.id);
-  const { data, error } = await db.from('grocery_items').insert({
+  const { error } = await db.from('grocery_items').insert({
     grocery_list_id: currentGroceryListId,
     name: val,
     checked: false,
     category: categorize(val)
-  }).select().single();
+  });
   if (error) {
     console.error('Error adding grocery item:', error.message);
     showToast('Kunde inte lägga till vara 😕');
-  } else if (data) {
-    groceryItems.push(data);
-    renderGrocery();
   }
+  // No need to push or render here — the real-time subscription handles it
 }
 
 document.getElementById('clear-checked').addEventListener('click', async () => {
@@ -1544,14 +1542,16 @@ document.getElementById('detail-add-grocery').addEventListener('click', async ()
     checked: false,
     category: categorize(ing)
   }));
-  const { data, error } = await db.from('grocery_items').insert(rows).select();
-  if (!error && data) {
-    groceryItems.push(...data);
-    showToast(`${data.length} ingredienser tillagda i inköpslistan 🛒`);
+  const { error } = await db.from('grocery_items').insert(rows);
+  if (error) {
+    console.error('Error adding ingredients:', error.message);
+    showToast('Kunde inte lägga till ingredienser 😕');
+  } else {
+    showToast(`${rows.length} ingredienser tillagda i inköpslistan 🛒`);
     document.getElementById('detail-modal').classList.remove('open');
     switchTab('grocery');
-    renderGrocery();
   }
+  // Real-time subscription handles rendering the new items
 });
 
 // ── ADD RECIPE MODAL ──
