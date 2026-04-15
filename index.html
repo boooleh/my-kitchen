@@ -613,6 +613,42 @@
   .detail-step-text { flex: 1; }
 
   /* ── COOKING MODE ── */
+  .cooking-rotate-prompt {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: #111;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 10;
+  }
+  .cooking-rotate-icon {
+    font-size: 3rem;
+    animation: rotateHint 1.5s ease-in-out infinite;
+  }
+  @keyframes rotateHint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+  }
+  .cooking-rotate-text {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #fff;
+  }
+  .cooking-rotate-sub {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.4);
+  }
+  @media (orientation: portrait) {
+    .cooking-modal.open .cooking-rotate-prompt { display: flex; }
+  }
+  @media (orientation: landscape) {
+    .cooking-rotate-prompt { display: none !important; }
+  }
+
   .cooking-modal {
     position: fixed;
     inset: 0;
@@ -1169,6 +1205,11 @@
 
 <!-- COOKING MODE -->
 <div class="cooking-modal" id="cooking-modal">
+  <div class="cooking-rotate-prompt">
+    <div class="cooking-rotate-icon">📱</div>
+    <div class="cooking-rotate-text">Rotera telefonen</div>
+    <div class="cooking-rotate-sub">Liggande läge ger bäst upplevelse</div>
+  </div>
   <div class="cooking-header">
     <div class="cooking-title-row">
       <span class="cooking-emoji" id="cooking-emoji"></span>
@@ -1614,6 +1655,11 @@ function openCookingMode(recipe) {
   document.getElementById('cooking-done').classList.remove('visible');
   document.getElementById('cooking-modal').classList.add('open');
   renderCookingStep(recipe);
+
+  // Try to lock to landscape (works on Android, silently fails on iOS)
+  if (screen.orientation?.lock) {
+    screen.orientation.lock('landscape').catch(() => {});
+  }
 }
 
 function renderCookingStep(recipe) {
@@ -1668,13 +1714,15 @@ document.getElementById('cooking-next').addEventListener('click', () => {
   }
 });
 
-document.getElementById('cooking-close').addEventListener('click', () => {
+function closeCookingMode() {
   document.getElementById('cooking-modal').classList.remove('open');
-});
+  if (screen.orientation?.unlock) {
+    screen.orientation.unlock();
+  }
+}
 
-document.getElementById('cooking-done-btn').addEventListener('click', () => {
-  document.getElementById('cooking-modal').classList.remove('open');
-});
+document.getElementById('cooking-close').addEventListener('click', closeCookingMode);
+document.getElementById('cooking-done-btn').addEventListener('click', closeCookingMode);
 
 
 // ── AUTH & HOUSEHOLD FLOW ──
