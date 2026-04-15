@@ -1731,13 +1731,19 @@ async function openCookingMode(recipe) {
   document.getElementById('cooking-modal').classList.add('open');
   renderCookingStep(recipe);
 
-  // Go fullscreen then lock to landscape
+  // Go fullscreen, then lock orientation once fullscreen is confirmed
   try {
     await document.documentElement.requestFullscreen();
-    await screen.orientation.lock('landscape');
-  } catch(err) {
-    showToast('Lock failed: ' + err.message);
-  }
+  } catch(err) {}
+  document.addEventListener('fullscreenchange', async () => {
+    if (document.fullscreenElement) {
+      try {
+        await screen.orientation.lock('landscape');
+      } catch(err) {
+        showToast('Lock failed: ' + err.message);
+      }
+    }
+  }, { once: true });
 }
 
 function renderCookingStep(recipe) {
