@@ -1206,6 +1206,7 @@
 <!-- COOKING MODE -->
 <div class="cooking-modal" id="cooking-modal">
   <div class="cooking-rotate-prompt">
+    <button class="cooking-close" onclick="closeCookingMode()" style="position:absolute;top:16px;right:16px;">✕</button>
     <div class="cooking-rotate-icon">📱</div>
     <div class="cooking-rotate-text">Rotera telefonen</div>
     <div class="cooking-rotate-sub">Liggande läge ger bäst upplevelse</div>
@@ -1656,10 +1657,7 @@ function openCookingMode(recipe) {
   document.getElementById('cooking-modal').classList.add('open');
   renderCookingStep(recipe);
 
-  // Try to lock to landscape (works on Android, silently fails on iOS)
-  if (screen.orientation?.lock) {
-    screen.orientation.lock('landscape').catch(() => {});
-  }
+  // Orientation is handled by CSS — rotate prompt shows in portrait, hides in landscape
 }
 
 function renderCookingStep(recipe) {
@@ -1716,9 +1714,6 @@ document.getElementById('cooking-next').addEventListener('click', () => {
 
 function closeCookingMode() {
   document.getElementById('cooking-modal').classList.remove('open');
-  if (screen.orientation?.unlock) {
-    screen.orientation.unlock();
-  }
 }
 
 document.getElementById('cooking-close').addEventListener('click', closeCookingMode);
