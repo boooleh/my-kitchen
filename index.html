@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mitt Kök</title>
+
+<!-- PWA: Install as app on home screen -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b35">
+
+<!-- iOS / Safari support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Mitt Kök">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1219,7 +1230,7 @@ db.from('households').select('count', { count: 'exact', head: true })
   });
 
 // ── STATE ──
-let groceryItems = JSON.parse(localStorage.getItem('mk-grocery') || '[]');
+let groceryItems = [];
 let recipes = JSON.parse(localStorage.getItem('mk-recipes') || '[]');
 let activeFilter = 'all';
 let currentRecipe = null;
@@ -1236,8 +1247,48 @@ if (recipes.length === 0) {
 }
 
 // ── UTILS ──
-function saveGrocery() { localStorage.setItem('mk-grocery', JSON.stringify(groceryItems)); }
 function saveRecipes() { localStorage.setItem('mk-recipes', JSON.stringify(recipes)); }
+
+// ── SUPABASE GROCERY SYNC ──
+let groceryChannel = null;
+
+async function loadGrocery() {
+  const { data, error } = await db
+    .from('grocery_items')
+    .select('*')
+    .eq('household_id', currentHousehold.id)
+    .order('created_at', { ascending: true });
+  if (!error) {
+    groceryItems = data || [];
+    renderGrocery();
+  }
+}
+
+function subscribeToGrocery() {
+  if (groceryChannel) groceryChannel.unsubscribe();
+  groceryChannel = db.channel('grocery-' + currentHousehold.id)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'grocery_items',
+      filter: `household_id=eq.${currentHousehold.id}`
+    }, (payload) => {
+      if (payload.eventType === 'INSERT') {
+        // Avoid duplicating items we already added optimistically
+        if (!groceryItems.find(i => i.id === payload.new.id)) {
+          groceryItems.push(payload.new);
+          renderGrocery();
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        const idx = groceryItems.findIndex(i => i.id === payload.new.id);
+        if (idx !== -1) { groceryItems[idx] = payload.new; renderGrocery(); }
+      } else if (payload.eventType === 'DELETE') {
+        groceryItems = groceryItems.filter(i => i.id !== payload.old.id);
+        renderGrocery();
+      }
+    })
+    .subscribe();
+}
 
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -1320,13 +1371,15 @@ function renderGrocery() {
       <div class="grocery-item-name">${item.name}</div>
       <span class="grocery-item-del" data-id="${item.id}">✕</span>
     `;
-    el.addEventListener('click', (e) => {
+    el.addEventListener('click', async (e) => {
       if (e.target.classList.contains('grocery-item-del')) {
         groceryItems = groceryItems.filter(i => i.id !== item.id);
-        saveGrocery(); renderGrocery();
+        renderGrocery();
+        await db.from('grocery_items').delete().eq('id', item.id);
       } else {
         item.checked = !item.checked;
-        saveGrocery(); renderGrocery();
+        renderGrocery();
+        await db.from('grocery_items').update({ checked: item.checked }).eq('id', item.id);
       }
     });
     list.appendChild(el);
@@ -1343,19 +1396,30 @@ function renderGrocery() {
 document.getElementById('grocery-add-btn').addEventListener('click', addGroceryItem);
 document.getElementById('grocery-input').addEventListener('keydown', e => { if (e.key === 'Enter') addGroceryItem(); });
 
-function addGroceryItem() {
+async function addGroceryItem() {
   const input = document.getElementById('grocery-input');
   const val = input.value.trim();
   if (!val) return;
-  groceryItems.push({ id: Date.now(), name: val, checked: false, category: categorize(val) });
   input.value = '';
-  saveGrocery();
-  renderGrocery();
+  const { data, error } = await db.from('grocery_items').insert({
+    household_id: currentHousehold.id,
+    name: val,
+    checked: false,
+    category: categorize(val)
+  }).select().single();
+  if (!error && data) {
+    groceryItems.push(data);
+    renderGrocery();
+  }
 }
 
-document.getElementById('clear-checked').addEventListener('click', () => {
+document.getElementById('clear-checked').addEventListener('click', async () => {
+  const checkedIds = groceryItems.filter(i => i.checked).map(i => i.id);
   groceryItems = groceryItems.filter(i => !i.checked);
-  saveGrocery(); renderGrocery();
+  renderGrocery();
+  if (checkedIds.length > 0) {
+    await db.from('grocery_items').delete().in('id', checkedIds);
+  }
 });
 
 // ── RECIPES ──
@@ -1432,19 +1496,22 @@ document.getElementById('detail-back').addEventListener('click', () => {
   document.getElementById('detail-modal').classList.remove('open');
 });
 
-document.getElementById('detail-add-grocery').addEventListener('click', () => {
+document.getElementById('detail-add-grocery').addEventListener('click', async () => {
   if (!currentRecipe) return;
-  const newItems = (currentRecipe.ingredients || []).map(ing => ({
-    id: Date.now() + Math.random(),
+  const rows = (currentRecipe.ingredients || []).map(ing => ({
+    household_id: currentHousehold.id,
     name: ing,
-    checked: false
+    checked: false,
+    category: categorize(ing)
   }));
-  groceryItems.push(...newItems);
-  saveGrocery();
-  showToast(`${newItems.length} ingredienser tillagda i inköpslistan 🛒`);
-  document.getElementById('detail-modal').classList.remove('open');
-  switchTab('grocery');
-  renderGrocery();
+  const { data, error } = await db.from('grocery_items').insert(rows).select();
+  if (!error && data) {
+    groceryItems.push(...data);
+    showToast(`${data.length} ingredienser tillagda i inköpslistan 🛒`);
+    document.getElementById('detail-modal').classList.remove('open');
+    switchTab('grocery');
+    renderGrocery();
+  }
 });
 
 // ── ADD RECIPE MODAL ──
@@ -1651,22 +1718,36 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
 
 // Check if user already belongs to a household
 async function checkHousehold() {
-  const { data: membership } = await db.from('household_members')
+  const { data: membership, error: membershipError } = await db.from('household_members')
     .select('household_id')
     .eq('user_id', currentUser.id)
     .maybeSingle();
 
+  if (membershipError) {
+    console.error('Could not load household membership:', membershipError.message);
+    showHouseholdScreen();
+    return;
+  }
+
   if (membership?.household_id) {
-    const { data: household } = await db.from('households')
+    const { data: household, error: householdError } = await db.from('households')
       .select('id, name, invite_code')
       .eq('id', membership.household_id)
       .maybeSingle();
+
+    if (householdError) {
+      console.error('Could not load household:', householdError.message);
+      showHouseholdScreen();
+      return;
+    }
+
     if (household) {
       currentHousehold = household;
       updateAccountPanel();
       hideAuthScreens();
       switchTab('grocery');
-      renderGrocery();
+      await loadGrocery();
+      subscribeToGrocery();
       renderRecipes();
       return;
     }
@@ -1707,7 +1788,8 @@ document.getElementById('household-submit').addEventListener('click', async () =
       .insert({ name: input, invite_code: inviteCode })
       .select().single();
     if (error) { errorEl.textContent = error.message; btn.textContent = 'Skapa hushåll'; btn.disabled = false; return; }
-    await db.from('household_members').insert({ household_id: household.id, user_id: currentUser.id, role: 'owner' });
+    const { error: memberError } = await db.from('household_members').insert({ household_id: household.id, user_id: currentUser.id, role: 'owner' });
+    if (memberError) { errorEl.textContent = memberError.message; btn.textContent = 'Skapa hushåll'; btn.disabled = false; return; }
     currentHousehold = household;
   } else {
     const { data: household, error } = await db.from('households')
@@ -1720,7 +1802,8 @@ document.getElementById('household-submit').addEventListener('click', async () =
   updateAccountPanel();
   hideAuthScreens();
   switchTab('grocery');
-  renderGrocery();
+  await loadGrocery();
+  subscribeToGrocery();
   renderRecipes();
   btn.disabled = false;
 });
@@ -1750,8 +1833,10 @@ document.getElementById('account-invite-code').addEventListener('click', () => {
 
 document.getElementById('account-signout').addEventListener('click', async () => {
   await db.auth.signOut();
+  if (groceryChannel) { groceryChannel.unsubscribe(); groceryChannel = null; }
   currentUser = null;
   currentHousehold = null;
+  groceryItems = [];
   document.getElementById('account-panel').classList.remove('open');
   showAuthScreen();
 });
