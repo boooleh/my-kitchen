@@ -1732,7 +1732,7 @@ function openCookingMode(recipe) {
   renderCookingStep(recipe);
 
   // Lock to landscape
-  screen.orientation?.lock('landscape').catch(err => console.error('Orientation lock failed:', err.message));
+  screen.orientation?.lock('landscape').catch(err => showToast('Lock failed: ' + err.message));
 }
 
 function renderCookingStep(recipe) {
