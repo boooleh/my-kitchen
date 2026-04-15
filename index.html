@@ -1299,7 +1299,6 @@ function subscribeToGrocery() {
       filter: `grocery_list_id=eq.${currentGroceryListId}`
     }, (payload) => {
       if (payload.eventType === 'INSERT') {
-        // Avoid duplicating items we already added optimistically
         if (!groceryItems.find(i => i.id === payload.new.id)) {
           groceryItems.push(payload.new);
           renderGrocery();
@@ -1402,9 +1401,8 @@ function renderGrocery() {
         renderGrocery();
         await db.from('grocery_items').delete().eq('id', item.id);
       } else {
-        item.checked = !item.checked;
-        renderGrocery();
-        await db.from('grocery_items').update({ checked: item.checked }).eq('id', item.id);
+        // Just update Supabase — real-time subscription handles the re-render
+        await db.from('grocery_items').update({ checked: !item.checked }).eq('id', item.id);
       }
     });
     list.appendChild(el);
@@ -1427,29 +1425,27 @@ async function addGroceryItem() {
   if (!val) return;
   input.value = '';
 
-  // If we don't have a list ID yet, try to get one now
   if (!currentGroceryListId) {
-    console.warn('currentGroceryListId is null — retrying getOrCreateGroceryList...');
     currentGroceryListId = await getOrCreateGroceryList();
   }
   if (!currentGroceryListId) {
-    console.error('Still no grocery list ID. Cannot add item.');
     showToast('Kunde inte hitta inköpslistan 😕');
     return;
   }
-
-  console.log('Inserting item — list ID:', currentGroceryListId, '| user:', currentUser?.id);
-  const { error } = await db.from('grocery_items').insert({
+  const { data, error } = await db.from('grocery_items').insert({
     grocery_list_id: currentGroceryListId,
     name: val,
     checked: false,
     category: categorize(val)
-  });
+  }).select().single();
   if (error) {
     console.error('Error adding grocery item:', error.message);
     showToast('Kunde inte lägga till vara 😕');
+  } else if (data && !groceryItems.find(i => i.id === data.id)) {
+    // Add locally only if real-time hasn't already added it
+    groceryItems.push(data);
+    renderGrocery();
   }
-  // No need to push or render here — the real-time subscription handles it
 }
 
 document.getElementById('clear-checked').addEventListener('click', async () => {
