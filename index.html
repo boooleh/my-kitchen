@@ -1657,7 +1657,8 @@ function openCookingMode(recipe) {
   document.getElementById('cooking-modal').classList.add('open');
   renderCookingStep(recipe);
 
-  // Orientation is handled by CSS — rotate prompt shows in portrait, hides in landscape
+  // Lock to landscape (works when installed as PWA)
+  screen.orientation?.lock('landscape').catch(() => {});
 }
 
 function renderCookingStep(recipe) {
@@ -1714,6 +1715,7 @@ document.getElementById('cooking-next').addEventListener('click', () => {
 
 function closeCookingMode() {
   document.getElementById('cooking-modal').classList.remove('open');
+  screen.orientation?.unlock();
 }
 
 document.getElementById('cooking-close').addEventListener('click', closeCookingMode);
