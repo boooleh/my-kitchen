@@ -477,6 +477,69 @@
   .modal-save-btn:hover { transform: scale(1.02); background: #e85a24; }
   .modal-save-btn:disabled { background: var(--gray-3); cursor: default; transform: none; }
 
+  /* ── EMOJI / IMAGE PICKER ── */
+  .img-picker { margin-bottom: 4px; }
+  .img-picker-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .img-tab {
+    flex: 1; padding: 8px 4px;
+    border: 2px solid var(--gray-2);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.8rem; font-weight: 600;
+    color: var(--gray-4); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .img-tab.active { border-color: var(--orange); color: var(--orange); background: var(--orange-light); }
+  .img-tab-panel { display: none; }
+  .img-tab-panel.active { display: block; }
+
+  .emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px; max-height: 150px; overflow-y: auto;
+  }
+  .emoji-option {
+    aspect-ratio: 1; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 1.25rem;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background: var(--gray-1); cursor: pointer;
+    transition: all 0.1s;
+  }
+  .emoji-option.selected { border-color: var(--orange); background: var(--orange-light); }
+  .emoji-option:hover { background: var(--gray-2); }
+
+  .photo-upload-area {
+    border: 2px dashed var(--gray-2);
+    border-radius: var(--radius-md);
+    padding: 24px 16px; text-align: center;
+    cursor: pointer; transition: all 0.15s;
+    min-height: 100px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 6px;
+  }
+  .photo-upload-area:hover { border-color: var(--orange); background: var(--orange-light); }
+  .photo-upload-area.has-image { padding: 0; overflow: hidden; border-style: solid; }
+  .photo-upload-area img { width: 100%; height: 120px; object-fit: cover; border-radius: 12px; display: block; }
+  .photo-upload-hint { font-size: 0.82rem; color: var(--gray-4); }
+  .photo-upload-icon { font-size: 1.8rem; }
+
+  /* Card & detail image variants */
+  .recipe-card-img {
+    width: 52px; height: 52px;
+    border-radius: var(--radius-sm);
+    object-fit: cover; flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .detail-hero-img {
+    width: 100%; height: 220px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+    margin-bottom: 4px;
+  }
+
   /* ── INGREDIENT PICKER ── */
   .ing-pick-item {
     display: flex;
@@ -1278,8 +1341,23 @@
     <form class="manual-area" id="manual-area" autocomplete="off" onsubmit="return false;">
       <label class="modal-label">Receptnamn</label>
       <input class="modal-input" id="recipe-name-input" type="search" placeholder="t.ex. Pasta Carbonara" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" />
-      <label class="modal-label">Emoji</label>
-      <input class="modal-input" id="recipe-emoji-input" type="search" placeholder="🍝" style="font-size:1.3rem;width:70px;" autocomplete="new-password" autocorrect="off" autocapitalize="off" />
+      <label class="modal-label">Ikon / Bild</label>
+      <div class="img-picker">
+        <div class="img-picker-tabs">
+          <button class="img-tab active" id="tab-emoji-btn" type="button">🎨 Välj ikon</button>
+          <button class="img-tab" id="tab-photo-btn" type="button">📷 Lägg till foto</button>
+        </div>
+        <div class="img-tab-panel active" id="panel-emoji">
+          <div class="emoji-grid" id="emoji-grid"></div>
+        </div>
+        <div class="img-tab-panel" id="panel-photo">
+          <div class="photo-upload-area" id="photo-upload-area">
+            <input type="file" id="recipe-image-input" accept="image/*" style="display:none">
+            <div class="photo-upload-icon">📷</div>
+            <div class="photo-upload-hint">Tryck för att välja ett foto</div>
+          </div>
+        </div>
+      </div>
       <label class="modal-label">Tid & portioner</label>
       <input class="modal-input" id="recipe-meta-input" type="search" placeholder="t.ex. 30 min · 4 portioner" autocomplete="new-password" autocorrect="off" autocapitalize="off" />
       <label class="modal-label">Kategori</label>
@@ -1495,6 +1573,7 @@ function mapRecipe(row) {
     tag: row.tag || '',
     created_by: row.created_by,
     is_public: row.is_public || false,
+    image_url: row.image_url || null,
     ingredients: (row.recipe_ingredients || [])
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(i => i.text),
@@ -1583,7 +1662,8 @@ async function addRecipeToDB(recipeData) {
       meta: recipeData.meta,
       tag: recipeData.tag,
       created_by: currentUser.id,
-      is_public: false
+      is_public: false,
+      image_url: recipeData.image_url || null
     })
     .select()
     .single();
@@ -1619,12 +1699,15 @@ async function updateRecipeInDB(id, recipeData) {
     );
   }
 
-  const { error } = await db.from('recipes').update({
+  const updatePayload = {
     name: recipeData.name,
     emoji: recipeData.emoji,
     meta: recipeData.meta,
     tag: recipeData.tag
-  }).eq('id', id);
+  };
+  // Only update image_url if explicitly provided (not keeping existing)
+  if (!recipeData.keepExistingImage) updatePayload.image_url = recipeData.image_url ?? null;
+  const { error } = await db.from('recipes').update(updatePayload).eq('id', id);
 
   if (error) { console.error('Error updating recipe:', error.message); return { error: error.message }; }
   return true;
@@ -1873,8 +1956,11 @@ function renderRecipes() {
     filtered.forEach(recipe => {
       const el = document.createElement('div');
       el.className = 'recipe-card';
+      const thumb = recipe.image_url
+        ? `<img class="recipe-card-img" src="${recipe.image_url}" alt="${recipe.name}">`
+        : `<div class="recipe-emoji">${recipe.emoji}</div>`;
       el.innerHTML = `
-        <div class="recipe-emoji">${recipe.emoji}</div>
+        ${thumb}
         <div class="recipe-info">
           <div class="recipe-name">${recipe.name}</div>
           <div class="recipe-meta">${recipe.meta}</div>
@@ -1905,8 +1991,11 @@ function renderRecipes() {
   filtered.forEach(recipe => {
     const el = document.createElement('div');
     el.className = 'recipe-card';
+    const thumb = recipe.image_url
+      ? `<img class="recipe-card-img" src="${recipe.image_url}" alt="${recipe.name}">`
+      : `<div class="recipe-emoji">${recipe.emoji}</div>`;
     el.innerHTML = `
-      <div class="recipe-emoji">${recipe.emoji}</div>
+      ${thumb}
       <div class="recipe-info">
         <div class="recipe-name">${recipe.name}</div>
         <div class="recipe-meta">${recipe.meta}</div>
@@ -1932,7 +2021,16 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
 // ── RECIPE DETAIL ──
 function openRecipeDetail(recipe) {
   currentRecipe = recipe;
-  document.getElementById('detail-emoji').textContent = recipe.emoji;
+  const heroEl = document.getElementById('detail-emoji');
+  if (recipe.image_url) {
+    heroEl.innerHTML = `<img class="detail-hero-img" src="${recipe.image_url}" alt="${recipe.name}">`;
+    heroEl.style.fontSize = '';
+    heroEl.style.padding = '0';
+  } else {
+    heroEl.textContent = recipe.emoji;
+    heroEl.style.fontSize = '';
+    heroEl.style.padding = '';
+  }
   document.getElementById('detail-name').textContent = recipe.name;
   document.getElementById('detail-meta').innerHTML = `<span>⏱ ${recipe.meta}</span><span>🏷 ${recipe.tag}</span>`;
   const ingDiv = document.getElementById('detail-ingredients');
@@ -2016,6 +2114,13 @@ document.getElementById('detail-delete-btn').addEventListener('click', async () 
     deleteConfirmPending = false;
     btn.textContent = '...';
     btn.disabled = true;
+
+    // Delete child rows first (FK constraints require this order)
+    const { error: ingError } = await db.from('recipe_ingredients').delete().eq('recipe_id', currentRecipe.id);
+    if (ingError) { showToast('Fel: ' + ingError.message); btn.textContent = '🗑 Ta bort'; btn.disabled = false; return; }
+
+    const { error: stepError } = await db.from('recipe_steps').delete().eq('recipe_id', currentRecipe.id);
+    if (stepError) { showToast('Fel: ' + stepError.message); btn.textContent = '🗑 Ta bort'; btn.disabled = false; return; }
 
     const { error } = await db.from('recipes').delete().eq('id', currentRecipe.id);
     if (error) {
@@ -2134,14 +2239,106 @@ document.getElementById('ingredient-modal').addEventListener('click', e => {
 
 // ── ADD / EDIT RECIPE MODAL ──
 let editingRecipeId = null;
+let selectedEmoji = '🍽';
+let selectedImageFile = null;
+let pickerMode = 'emoji'; // 'emoji' | 'photo'
 
-const MODAL_FIELDS = ['recipe-name-input','recipe-emoji-input','recipe-meta-input','recipe-tag-input','recipe-ingredients-input','recipe-steps-input'];
+const FOOD_EMOJIS = [
+  '🍕','🍔','🌮','🌯','🥗','🍜','🍝','🍛','🍲','🥘','🫕','🍱',
+  '🥩','🍗','🥚','🍳','🥞','🧇','🥓','🌭','🥪','🫔','🥙','🍣',
+  '🦐','🦞','🦀','🐟','🥦','🥕','🥑','🧄','🍅','🫑','🌽','🥔',
+  '🍓','🫐','🍇','🍊','🍋','🍌','🍉','🍒','🥝','🍰','🎂','🧁',
+  '🍩','🍪','🍫','🍮','🥧','🍦','🍨','🧆','🥜','🧀','🫙','🍽',
+  '☕','🍵','🧋','🥤','🍷','🥂','🍺','🧉','🫖','🥛'
+];
+
+const MODAL_FIELDS = ['recipe-name-input','recipe-meta-input','recipe-tag-input','recipe-ingredients-input','recipe-steps-input'];
+
+function initEmojiPicker() {
+  const grid = document.getElementById('emoji-grid');
+  grid.innerHTML = '';
+  FOOD_EMOJIS.forEach(em => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'emoji-option' + (em === selectedEmoji ? ' selected' : '');
+    btn.textContent = em;
+    btn.addEventListener('click', () => {
+      selectedEmoji = em;
+      grid.querySelectorAll('.emoji-option').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function switchPickerTab(mode) {
+  pickerMode = mode;
+  document.getElementById('tab-emoji-btn').classList.toggle('active', mode === 'emoji');
+  document.getElementById('tab-photo-btn').classList.toggle('active', mode === 'photo');
+  document.getElementById('panel-emoji').classList.toggle('active', mode === 'emoji');
+  document.getElementById('panel-photo').classList.toggle('active', mode === 'photo');
+}
+
+document.getElementById('tab-emoji-btn').addEventListener('click', () => switchPickerTab('emoji'));
+document.getElementById('tab-photo-btn').addEventListener('click', () => switchPickerTab('photo'));
+
+// Photo upload area click → open file picker
+document.getElementById('photo-upload-area').addEventListener('click', () => {
+  document.getElementById('recipe-image-input').click();
+});
+document.getElementById('recipe-image-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  selectedImageFile = file;
+  const area = document.getElementById('photo-upload-area');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    area.innerHTML = `<img src="${ev.target.result}" alt="preview">`;
+    area.classList.add('has-image');
+  };
+  reader.readAsDataURL(file);
+});
+
+async function uploadRecipeImage(file, recipeId) {
+  const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
+  const path = `${currentUser.id}/${recipeId}.${ext}`;
+  const { error } = await db.storage.from('recipe-images').upload(path, file, { upsert: true, contentType: file.type });
+  if (error) { console.error('Image upload error:', error.message); return null; }
+  const { data } = db.storage.from('recipe-images').getPublicUrl(path);
+  // Add cache-bust so updated images reload correctly
+  return data.publicUrl + '?t=' + Date.now();
+}
 
 function resetAddModal() {
   editingRecipeId = null;
+  selectedEmoji = '🍽';
+  selectedImageFile = null;
   document.querySelector('#add-modal .modal-title').textContent = 'Lägg till recept';
   document.getElementById('modal-save-btn').textContent = 'Spara recept';
   MODAL_FIELDS.forEach(id => document.getElementById(id).value = '');
+  // Reset photo area
+  const area = document.getElementById('photo-upload-area');
+  area.classList.remove('has-image');
+  area.innerHTML = `
+    <input type="file" id="recipe-image-input" accept="image/*" style="display:none">
+    <div class="photo-upload-icon">📷</div>
+    <div class="photo-upload-hint">Tryck för att välja ett foto</div>`;
+  document.getElementById('recipe-image-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    selectedImageFile = file;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      area.innerHTML = `<img src="${ev.target.result}" alt="preview">`;
+      area.classList.add('has-image');
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('photo-upload-area').addEventListener('click', () => {
+    document.getElementById('recipe-image-input').click();
+  });
+  switchPickerTab('emoji');
+  initEmojiPicker();
 }
 
 function openEditModal(recipe) {
@@ -2149,11 +2346,34 @@ function openEditModal(recipe) {
   document.querySelector('#add-modal .modal-title').textContent = 'Redigera recept';
   document.getElementById('modal-save-btn').textContent = 'Spara ändringar';
   document.getElementById('recipe-name-input').value = recipe.name || '';
-  document.getElementById('recipe-emoji-input').value = recipe.emoji || '';
   document.getElementById('recipe-meta-input').value = recipe.meta || '';
   document.getElementById('recipe-tag-input').value = recipe.tag || '';
   document.getElementById('recipe-ingredients-input').value = (recipe.ingredients || []).join('\n');
   document.getElementById('recipe-steps-input').value = (recipe.steps || []).join('\n');
+  selectedImageFile = null;
+
+  if (recipe.image_url) {
+    // Switch to photo tab and show current image as preview
+    switchPickerTab('photo');
+    const area = document.getElementById('photo-upload-area');
+    area.innerHTML = `<img src="${recipe.image_url}" alt="preview">`;
+    area.classList.add('has-image');
+    // Re-attach click handler so user can replace photo
+    area.addEventListener('click', () => document.getElementById('recipe-image-input').click(), { once: true });
+    document.getElementById('recipe-image-input').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      selectedImageFile = file;
+      const reader = new FileReader();
+      reader.onload = ev => { area.innerHTML = `<img src="${ev.target.result}" alt="preview">`; area.classList.add('has-image'); };
+      reader.readAsDataURL(file);
+    }, { once: true });
+  } else {
+    selectedEmoji = recipe.emoji || '🍽';
+    switchPickerTab('emoji');
+    initEmojiPicker();
+  }
+
   pushModalHistory();
   document.getElementById('add-modal').classList.add('open');
 }
@@ -2177,6 +2397,9 @@ document.getElementById('add-modal').addEventListener('click', e => {
   }
 });
 
+// Init picker on page load
+initEmojiPicker();
+
 document.getElementById('modal-save-btn').addEventListener('click', async () => {
   const name = document.getElementById('recipe-name-input').value.trim();
   if (!name) { showToast('Lägg till ett receptnamn'); return; }
@@ -2188,14 +2411,23 @@ document.getElementById('modal-save-btn').addEventListener('click', async () => 
 
   const recipeData = {
     name,
-    emoji: document.getElementById('recipe-emoji-input').value.trim() || '🍽',
+    emoji: pickerMode === 'emoji' ? selectedEmoji : '🍽',
+    image_url: null, // will be set after upload if photo mode
     meta: document.getElementById('recipe-meta-input').value.trim() || '— min',
     tag: document.getElementById('recipe-tag-input').value.trim() || 'Other',
     ingredients: document.getElementById('recipe-ingredients-input').value.trim().split('\n').filter(Boolean),
-    steps: document.getElementById('recipe-steps-input').value.trim().split('\n').filter(Boolean)
+    steps: document.getElementById('recipe-steps-input').value.trim().split('\n').filter(Boolean),
+    keepExistingImage: pickerMode === 'photo' && !selectedImageFile // editing, no new file chosen
   };
 
   if (editingRecipeId !== null) {
+    // If new photo selected, upload it first
+    if (pickerMode === 'photo' && selectedImageFile) {
+      const url = await uploadRecipeImage(selectedImageFile, editingRecipeId);
+      recipeData.image_url = url;
+    } else if (pickerMode === 'emoji') {
+      recipeData.image_url = null; // switched back to emoji, clear image
+    }
     const result = await updateRecipeInDB(editingRecipeId, recipeData);
     if (result?.error) {
       showToast('Fel: ' + result.error);
@@ -2217,6 +2449,11 @@ document.getElementById('modal-save-btn').addEventListener('click', async () => 
       btn.textContent = originalText;
       btn.disabled = false;
     } else if (result) {
+      // If photo mode and a file was selected, upload it now that we have the recipe ID
+      if (pickerMode === 'photo' && selectedImageFile) {
+        const url = await uploadRecipeImage(selectedImageFile, result);
+        if (url) await db.from('recipes').update({ image_url: url }).eq('id', result);
+      }
       document.getElementById('add-modal').classList.remove('open');
       resetAddModal();
       showToast('Recept sparat! 🎉');
