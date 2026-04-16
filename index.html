@@ -510,7 +510,6 @@
     z-index: 200;
     display: none;
     flex-direction: column;
-    overflow-y: auto;
     animation: slideInRight 0.35s var(--ease-out);
   }
   .detail-modal.open { display: flex; }
@@ -520,10 +519,11 @@
   }
 
   .detail-top {
-    padding: 52px 24px 24px;
+    padding: 52px 24px 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-shrink: 0;
   }
   .detail-back {
     background: var(--gray-1);
@@ -536,20 +536,103 @@
     transition: background 0.15s;
   }
   .detail-back:hover { background: var(--gray-2); }
-
-  .detail-add-grocery {
-    background: var(--orange-light);
+  .detail-menu-btn {
+    background: var(--gray-1);
     border: none;
-    border-radius: 100px;
-    padding: 9px 16px;
-    font-family: 'Raleway', sans-serif;
-    font-size: 0.75rem;
+    border-radius: 50%;
+    width: 40px; height: 40px;
+    font-size: 1.1rem;
     font-weight: 700;
-    color: var(--orange);
+    letter-spacing: 1px;
     cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
     transition: background 0.15s;
   }
-  .detail-add-grocery:hover { background: var(--orange-mid); }
+  .detail-menu-btn:hover { background: var(--gray-2); }
+
+  .detail-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 16px;
+  }
+
+  .detail-actions {
+    display: flex;
+    gap: 12px;
+    padding: 16px 24px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--gray-2);
+    flex-shrink: 0;
+    background: var(--white);
+  }
+  .detail-action-secondary {
+    flex: 1;
+    padding: 16px;
+    border: 2px solid var(--gray-2);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--black);
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .detail-action-secondary:hover { border-color: var(--gray-3); }
+  .detail-action-primary {
+    flex: 1;
+    padding: 16px;
+    background: var(--orange);
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #fff;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .detail-action-primary:hover { opacity: 0.9; }
+
+  /* ── OVERFLOW MENU ── */
+  .detail-menu-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 201;
+    background: rgba(0,0,0,0.35);
+    display: none;
+    align-items: flex-end;
+    backdrop-filter: blur(2px);
+  }
+  .detail-menu-overlay.open { display: flex; }
+  .detail-menu-sheet {
+    width: 100%;
+    background: var(--white);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 12px 0 calc(24px + env(safe-area-inset-bottom));
+    animation: slideUp 0.28s var(--ease-out);
+  }
+  .detail-menu-handle {
+    width: 36px; height: 4px;
+    background: var(--gray-2);
+    border-radius: 2px;
+    margin: 0 auto 16px;
+  }
+  .detail-menu-item {
+    width: 100%;
+    padding: 17px 24px;
+    background: none;
+    border: none;
+    text-align: left;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--black);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .detail-menu-item:hover { background: var(--gray-1); }
+  .detail-menu-danger { color: #e53935; }
 
   .detail-hero {
     font-size: 5rem;
@@ -1215,25 +1298,35 @@
 <div class="detail-modal" id="detail-modal">
   <div class="detail-top">
     <button class="detail-back" id="detail-back">←</button>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
-      <button class="detail-add-grocery" id="detail-edit-btn">✏️ Redigera</button>
-      <button class="detail-add-grocery" id="detail-delete-btn" style="color:#e53935;">🗑 Ta bort</button>
-      <button class="detail-add-grocery" id="detail-public-btn">🔒 Privat</button>
-      <button class="detail-add-grocery" id="detail-save-btn" style="background:var(--orange);color:#fff;">💾 Spara</button>
-      <button class="detail-add-grocery" id="detail-add-grocery">+ Inköpslista</button>
-      <button class="detail-add-grocery" id="detail-cook-btn" style="background:var(--orange);color:#fff;">👨‍🍳 Laga</button>
+    <button class="detail-menu-btn" id="detail-menu-btn">···</button>
+  </div>
+  <div class="detail-scroll">
+    <div class="detail-hero" id="detail-emoji"></div>
+    <div class="detail-name" id="detail-name"></div>
+    <div class="detail-meta" id="detail-meta"></div>
+    <div class="detail-section">
+      <div class="detail-section-title">Ingredienser</div>
+      <div id="detail-ingredients"></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Steg</div>
+      <div class="detail-steps" id="detail-steps"></div>
     </div>
   </div>
-  <div class="detail-hero" id="detail-emoji"></div>
-  <div class="detail-name" id="detail-name"></div>
-  <div class="detail-meta" id="detail-meta"></div>
-  <div class="detail-section">
-    <div class="detail-section-title">Ingredienser</div>
-    <div id="detail-ingredients"></div>
+  <div class="detail-actions">
+    <button class="detail-action-secondary" id="detail-add-grocery">+ Inköpslista</button>
+    <button class="detail-action-primary" id="detail-cook-btn">👨‍🍳 Laga</button>
   </div>
-  <div class="detail-section">
-    <div class="detail-section-title">Steg</div>
-    <div class="detail-steps" id="detail-steps"></div>
+</div>
+
+<!-- RECIPE OVERFLOW MENU -->
+<div class="detail-menu-overlay" id="detail-menu-overlay">
+  <div class="detail-menu-sheet">
+    <div class="detail-menu-handle"></div>
+    <button class="detail-menu-item" id="detail-edit-btn">✏️ Redigera</button>
+    <button class="detail-menu-item" id="detail-public-btn">🔒 Privat</button>
+    <button class="detail-menu-item" id="detail-save-btn">💾 Spara recept</button>
+    <button class="detail-menu-item detail-menu-danger" id="detail-delete-btn">🗑 Ta bort</button>
   </div>
 </div>
 
@@ -1533,7 +1626,7 @@ async function updateRecipeInDB(id, recipeData) {
     tag: recipeData.tag
   }).eq('id', id);
 
-  if (error) { console.error('Error updating recipe:', error.message); return false; }
+  if (error) { console.error('Error updating recipe:', error.message); return { error: error.message }; }
   return true;
 }
 
@@ -1863,6 +1956,7 @@ function openRecipeDetail(recipe) {
   const isOwnRecipe = recipe.created_by === currentUser?.id;
   const isFromOtherHousehold = recipe.household_id !== currentHousehold?.id;
 
+  // Show/hide overflow menu items based on recipe ownership
   document.getElementById('detail-edit-btn').style.display = isOwnRecipe ? '' : 'none';
   document.getElementById('detail-delete-btn').style.display = isOwnRecipe ? '' : 'none';
   document.getElementById('detail-delete-btn').textContent = '🗑 Ta bort';
@@ -1870,12 +1964,29 @@ function openRecipeDetail(recipe) {
   document.getElementById('detail-public-btn').textContent = recipe.is_public ? '🌍 Publik' : '🔒 Privat';
   document.getElementById('detail-save-btn').style.display = isFromOtherHousehold ? '' : 'none';
 
+  // Only show the ··· menu button if there's anything in the menu
+  const hasMenu = isOwnRecipe || isFromOtherHousehold;
+  document.getElementById('detail-menu-btn').style.display = hasMenu ? '' : 'none';
+
   pushModalHistory();
   document.getElementById('detail-modal').classList.add('open');
 }
 
 document.getElementById('detail-back').addEventListener('click', () => {
   document.getElementById('detail-modal').classList.remove('open');
+});
+
+function openDetailMenu() {
+  pushModalHistory();
+  document.getElementById('detail-menu-overlay').classList.add('open');
+}
+function closeDetailMenu() {
+  document.getElementById('detail-menu-overlay').classList.remove('open');
+}
+
+document.getElementById('detail-menu-btn').addEventListener('click', openDetailMenu);
+document.getElementById('detail-menu-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('detail-menu-overlay')) closeDetailMenu();
 });
 
 // Delete recipe (creator only) — two taps to confirm
@@ -2049,6 +2160,7 @@ function openEditModal(recipe) {
 
 document.getElementById('detail-edit-btn').addEventListener('click', () => {
   if (!currentRecipe) return;
+  closeDetailMenu();
   openEditModal(currentRecipe);
 });
 
@@ -2084,8 +2196,12 @@ document.getElementById('modal-save-btn').addEventListener('click', async () => 
   };
 
   if (editingRecipeId !== null) {
-    const ok = await updateRecipeInDB(editingRecipeId, recipeData);
-    if (ok) {
+    const result = await updateRecipeInDB(editingRecipeId, recipeData);
+    if (result?.error) {
+      showToast('Fel: ' + result.error);
+      btn.textContent = originalText;
+      btn.disabled = false;
+    } else if (result) {
       document.getElementById('add-modal').classList.remove('open');
       resetAddModal();
       showToast('Recept uppdaterat! ✏️');
@@ -2458,11 +2574,12 @@ function pushModalHistory() {
 window.addEventListener('popstate', () => {
   // Close the topmost open modal, in priority order
   const modals = [
-    { id: 'cooking-modal',    close: closeCookingMode },
-    { id: 'ingredient-modal', close: () => document.getElementById('ingredient-modal').classList.remove('open') },
-    { id: 'add-modal',        close: () => { document.getElementById('add-modal').classList.remove('open'); resetAddModal(); } },
-    { id: 'detail-modal',     close: () => document.getElementById('detail-modal').classList.remove('open') },
-    { id: 'account-panel',   close: () => document.getElementById('account-panel').classList.remove('open') },
+    { id: 'cooking-modal',       close: closeCookingMode },
+    { id: 'detail-menu-overlay', close: closeDetailMenu },
+    { id: 'ingredient-modal',    close: () => document.getElementById('ingredient-modal').classList.remove('open') },
+    { id: 'add-modal',           close: () => { document.getElementById('add-modal').classList.remove('open'); resetAddModal(); } },
+    { id: 'detail-modal',        close: () => document.getElementById('detail-modal').classList.remove('open') },
+    { id: 'account-panel',       close: () => document.getElementById('account-panel').classList.remove('open') },
   ];
   for (const { id, close } of modals) {
     if (document.getElementById(id)?.classList.contains('open')) {
