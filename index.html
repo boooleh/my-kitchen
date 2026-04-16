@@ -1171,8 +1171,9 @@
         <button class="filter-chip" data-filter="quick">Snabbt ⚡</button>
         <button class="filter-chip" data-filter="family">Familj 💛</button>
         <button class="filter-chip" data-filter="veggie">Veggo 🌱</button>
+        <button class="filter-chip" data-filter="explore">Utforska 🌍</button>
       </div>
-      <div class="section-label">Sparade recept</div>
+      <div class="section-label" id="recipe-section-label">Sparade recept</div>
       <div class="recipe-list" id="recipe-list"></div>
       <div class="recipe-add-card" id="recipe-add-btn">
         <div style="font-size:1.5rem;margin-bottom:6px;">+</div>
@@ -1212,8 +1213,10 @@
 <div class="detail-modal" id="detail-modal">
   <div class="detail-top">
     <button class="detail-back" id="detail-back">←</button>
-    <div style="display:flex;gap:8px;align-items:center;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
       <button class="detail-add-grocery" id="detail-edit-btn">✏️ Redigera</button>
+      <button class="detail-add-grocery" id="detail-public-btn">🔒 Privat</button>
+      <button class="detail-add-grocery" id="detail-save-btn" style="background:var(--orange);color:#fff;">💾 Spara</button>
       <button class="detail-add-grocery" id="detail-add-grocery">+ Inköpslista</button>
       <button class="detail-add-grocery" id="detail-cook-btn" style="background:var(--orange);color:#fff;">👨‍🍳 Laga</button>
     </div>
@@ -1313,6 +1316,7 @@ db.from('households').select('count', { count: 'exact', head: true })
 // ── STATE ──
 let groceryItems = [];
 let recipes = [];
+let publicRecipes = [];
 let activeFilter = 'all';
 let currentRecipe = null;
 let addMode = 'manual';
@@ -1394,6 +1398,7 @@ function mapRecipe(row) {
     meta: row.meta || '',
     tag: row.tag || '',
     created_by: row.created_by,
+    is_public: row.is_public || false,
     ingredients: (row.recipe_ingredients || [])
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(i => i.text),
@@ -1459,6 +1464,17 @@ function subscribeToRecipes() {
       }
     })
     .subscribe();
+}
+
+async function loadPublicRecipes() {
+  const { data, error } = await db
+    .from('recipes')
+    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)')
+    .eq('is_public', true)
+    .neq('household_id', currentHousehold.id)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('Error loading public recipes:', error.message); return; }
+  publicRecipes = (data || []).map(mapRecipe);
 }
 
 async function addRecipeToDB(recipeData) {
@@ -1741,9 +1757,43 @@ document.getElementById('clear-checked').addEventListener('click', async () => {
 function renderRecipes() {
   const list = document.getElementById('recipe-list');
   const count = document.getElementById('recipe-count');
+  const sectionLabel = document.getElementById('recipe-section-label');
+  const addBtn = document.getElementById('recipe-add-btn');
   const search = document.getElementById('recipe-search').value.toLowerCase();
-  count.textContent = recipes.length + (recipes.length !== 1 ? ' recept sparade' : ' recept sparat');
   list.innerHTML = '';
+
+  // ── Utforska mode: show public recipes from other households ──
+  if (activeFilter === 'explore') {
+    sectionLabel.textContent = 'Publika recept';
+    addBtn.style.display = 'none';
+    count.textContent = publicRecipes.length + (publicRecipes.length !== 1 ? ' publika recept' : ' publikt recept');
+    const filtered = publicRecipes.filter(r =>
+      r.name.toLowerCase().includes(search) || r.tag.toLowerCase().includes(search)
+    );
+    if (filtered.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:40px 24px;color:var(--gray-3);font-size:0.9rem;">Inga publika recept hittades 🌍</div>';
+    }
+    filtered.forEach(recipe => {
+      const el = document.createElement('div');
+      el.className = 'recipe-card';
+      el.innerHTML = `
+        <div class="recipe-emoji">${recipe.emoji}</div>
+        <div class="recipe-info">
+          <div class="recipe-name">${recipe.name}</div>
+          <div class="recipe-meta">${recipe.meta}</div>
+        </div>
+        <div class="recipe-badge" style="background:var(--orange-light);color:var(--orange);">🌍 ${recipe.tag}</div>
+      `;
+      el.addEventListener('click', () => openRecipeDetail(recipe));
+      list.appendChild(el);
+    });
+    return;
+  }
+
+  // ── Normal mode: your household's recipes ──
+  sectionLabel.textContent = 'Sparade recept';
+  addBtn.style.display = '';
+  count.textContent = recipes.length + (recipes.length !== 1 ? ' recept sparade' : ' recept sparat');
 
   const filtered = recipes.filter(r => {
     const matchFilter = activeFilter === 'all' ||
@@ -1764,7 +1814,7 @@ function renderRecipes() {
         <div class="recipe-name">${recipe.name}</div>
         <div class="recipe-meta">${recipe.meta}</div>
       </div>
-      <div class="recipe-badge">${recipe.tag}</div>
+      <div class="recipe-badge">${recipe.tag}${recipe.is_public ? ' 🌍' : ''}</div>
     `;
     el.addEventListener('click', () => openRecipeDetail(recipe));
     list.appendChild(el);
@@ -1774,9 +1824,10 @@ function renderRecipes() {
 document.getElementById('recipe-search').addEventListener('input', renderRecipes);
 
 document.querySelectorAll('.filter-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
+  chip.addEventListener('click', async () => {
     activeFilter = chip.dataset.filter;
     document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c === chip));
+    if (activeFilter === 'explore') await loadPublicRecipes();
     renderRecipes();
   });
 });
@@ -1805,9 +1856,13 @@ function openRecipeDetail(recipe) {
       el.querySelector('.detail-step-check').textContent = el.classList.contains('done') ? '✓' : '';
     });
   });
-  // Only show the edit button if this recipe belongs to the current user
-  document.getElementById('detail-edit-btn').style.display =
-    recipe.created_by === currentUser?.id ? '' : 'none';
+  const isOwnRecipe = recipe.created_by === currentUser?.id;
+  const isFromOtherHousehold = recipe.household_id !== currentHousehold?.id;
+
+  document.getElementById('detail-edit-btn').style.display = isOwnRecipe ? '' : 'none';
+  document.getElementById('detail-public-btn').style.display = isOwnRecipe ? '' : 'none';
+  document.getElementById('detail-public-btn').textContent = recipe.is_public ? '🌍 Publik' : '🔒 Privat';
+  document.getElementById('detail-save-btn').style.display = isFromOtherHousehold ? '' : 'none';
 
   pushModalHistory();
   document.getElementById('detail-modal').classList.add('open');
@@ -1815,6 +1870,48 @@ function openRecipeDetail(recipe) {
 
 document.getElementById('detail-back').addEventListener('click', () => {
   document.getElementById('detail-modal').classList.remove('open');
+});
+
+// Toggle recipe public/private (creator only)
+document.getElementById('detail-public-btn').addEventListener('click', async () => {
+  if (!currentRecipe) return;
+  const newValue = !currentRecipe.is_public;
+  const { error } = await db.from('recipes').update({ is_public: newValue }).eq('id', currentRecipe.id);
+  if (!error) {
+    currentRecipe.is_public = newValue;
+    const idx = recipes.findIndex(r => r.id === currentRecipe.id);
+    if (idx !== -1) recipes[idx].is_public = newValue;
+    document.getElementById('detail-public-btn').textContent = newValue ? '🌍 Publik' : '🔒 Privat';
+    showToast(newValue ? 'Receptet är nu publikt 🌍' : 'Receptet är nu privat 🔒');
+    renderRecipes();
+  }
+});
+
+// Copy a public recipe from another household into your own
+document.getElementById('detail-save-btn').addEventListener('click', async () => {
+  if (!currentRecipe) return;
+  const btn = document.getElementById('detail-save-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+  const newId = await addRecipeToDB({
+    name: currentRecipe.name,
+    emoji: currentRecipe.emoji,
+    meta: currentRecipe.meta,
+    tag: currentRecipe.tag,
+    ingredients: currentRecipe.ingredients,
+    steps: currentRecipe.steps
+  });
+  if (newId) {
+    showToast('Recept sparat i ditt hushåll! 🎉');
+    document.getElementById('detail-modal').classList.remove('open');
+    activeFilter = 'all';
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === 'all'));
+    renderRecipes();
+  } else {
+    showToast('Kunde inte spara receptet 😕');
+    btn.textContent = '💾 Spara';
+    btn.disabled = false;
+  }
 });
 
 // ── INGREDIENT PICKER ──

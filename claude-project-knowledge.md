@@ -55,7 +55,9 @@ Goal: Share grocery list and recipes in real time between household members.
 **Status:**
 - ✅ Supabase account created
 - ✅ All 7 database tables created
-- ⏳ Next: get Supabase API credentials and connect the app
+- ✅ Grocery list synced to Supabase with real-time updates
+- ✅ Recipes synced to Supabase with real-time updates
+- ✅ All household members can view and edit all shared recipes
 
 **Database tables:**
 
