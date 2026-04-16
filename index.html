@@ -2019,7 +2019,7 @@ document.getElementById('detail-delete-btn').addEventListener('click', async () 
 
     const { error } = await db.from('recipes').delete().eq('id', currentRecipe.id);
     if (error) {
-      showToast('Kunde inte ta bort receptet 😕');
+      showToast('Fel: ' + error.message);
       btn.textContent = '🗑 Ta bort';
       btn.disabled = false;
     } else {
