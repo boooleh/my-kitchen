@@ -1217,6 +1217,7 @@
     <button class="detail-back" id="detail-back">←</button>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
       <button class="detail-add-grocery" id="detail-edit-btn">✏️ Redigera</button>
+      <button class="detail-add-grocery" id="detail-delete-btn" style="color:#e53935;">🗑 Ta bort</button>
       <button class="detail-add-grocery" id="detail-public-btn">🔒 Privat</button>
       <button class="detail-add-grocery" id="detail-save-btn" style="background:var(--orange);color:#fff;">💾 Spara</button>
       <button class="detail-add-grocery" id="detail-add-grocery">+ Inköpslista</button>
@@ -1863,6 +1864,8 @@ function openRecipeDetail(recipe) {
   const isFromOtherHousehold = recipe.household_id !== currentHousehold?.id;
 
   document.getElementById('detail-edit-btn').style.display = isOwnRecipe ? '' : 'none';
+  document.getElementById('detail-delete-btn').style.display = isOwnRecipe ? '' : 'none';
+  document.getElementById('detail-delete-btn').textContent = '🗑 Ta bort';
   document.getElementById('detail-public-btn').style.display = isOwnRecipe ? '' : 'none';
   document.getElementById('detail-public-btn').textContent = recipe.is_public ? '🌍 Publik' : '🔒 Privat';
   document.getElementById('detail-save-btn').style.display = isFromOtherHousehold ? '' : 'none';
@@ -1873,6 +1876,48 @@ function openRecipeDetail(recipe) {
 
 document.getElementById('detail-back').addEventListener('click', () => {
   document.getElementById('detail-modal').classList.remove('open');
+});
+
+// Delete recipe (creator only) — two taps to confirm
+let deleteConfirmPending = false;
+let deleteConfirmTimer = null;
+
+document.getElementById('detail-delete-btn').addEventListener('click', async () => {
+  if (!currentRecipe) return;
+  const btn = document.getElementById('detail-delete-btn');
+
+  if (!deleteConfirmPending) {
+    // First tap — ask for confirmation
+    deleteConfirmPending = true;
+    btn.textContent = '⚠️ Säker?';
+    btn.style.background = '#e53935';
+    btn.style.color = '#fff';
+    // Auto-reset after 3 seconds if user doesn't confirm
+    deleteConfirmTimer = setTimeout(() => {
+      deleteConfirmPending = false;
+      btn.textContent = '🗑 Ta bort';
+      btn.style.background = '';
+      btn.style.color = '#e53935';
+    }, 3000);
+  } else {
+    // Second tap — confirmed, delete it
+    clearTimeout(deleteConfirmTimer);
+    deleteConfirmPending = false;
+    btn.textContent = '...';
+    btn.disabled = true;
+
+    const { error } = await db.from('recipes').delete().eq('id', currentRecipe.id);
+    if (error) {
+      showToast('Kunde inte ta bort receptet 😕');
+      btn.textContent = '🗑 Ta bort';
+      btn.disabled = false;
+    } else {
+      recipes = recipes.filter(r => r.id !== currentRecipe.id);
+      renderRecipes();
+      document.getElementById('detail-modal').classList.remove('open');
+      showToast('Receptet är borttaget 🗑');
+    }
+  }
 });
 
 // Toggle recipe public/private (creator only)
