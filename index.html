@@ -1083,7 +1083,7 @@
     </button>
   </div>
   <div class="household-form" id="household-form" style="display:none;">
-    <input class="auth-input" id="household-input" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="off" />
+    <input class="auth-input" id="household-input" placeholder="" autocomplete="new-password" autocorrect="off" autocapitalize="off" />
     <div class="auth-error" id="household-error"></div>
     <button class="auth-btn" id="household-submit">Fortsätt</button>
   </div>
@@ -1139,10 +1139,10 @@
         <div class="grocery-title">Inköpslista</div>
         <div class="grocery-sub" id="grocery-count">0 varor</div>
       </div>
-      <div class="grocery-add">
-        <input class="grocery-input" id="grocery-input" type="text" autocomplete="off" autocorrect="off" placeholder="Lägg till en vara..." />
-        <button class="add-btn" id="grocery-add-btn">+</button>
-      </div>
+      <form class="grocery-add" autocomplete="off" onsubmit="return false;">
+        <input class="grocery-input" id="grocery-input" type="text" autocomplete="new-password" autocorrect="off" placeholder="Lägg till en vara..." />
+        <button class="add-btn" id="grocery-add-btn" type="button">+</button>
+      </form>
       <div class="section-label" id="grocery-section-label">Varor</div>
       <div class="grocery-list" id="grocery-list"></div>
       <div id="grocery-empty" style="display:none; text-align:center; padding: 40px 24px; color: var(--gray-3);">
@@ -1162,10 +1162,10 @@
         <div class="recipes-title">Dina recept</div>
         <div class="recipes-sub" id="recipe-count">0 recept sparade</div>
       </div>
-      <div class="recipe-search">
+      <form class="recipe-search" autocomplete="off" onsubmit="return false;">
         <span>🔍</span>
-        <input id="recipe-search" placeholder="Sök recept..." autocomplete="off" autocorrect="off" autocapitalize="off" />
-      </div>
+        <input id="recipe-search" placeholder="Sök recept..." autocomplete="new-password" autocorrect="off" autocapitalize="off" />
+      </form>
       <div class="recipe-filters" id="recipe-filters">
         <button class="filter-chip active" data-filter="all">Alla</button>
         <button class="filter-chip" data-filter="quick">Snabbt ⚡</button>
@@ -1189,22 +1189,22 @@
     <div class="modal-handle"></div>
     <div class="modal-title">Lägg till recept</div>
 
-    <div class="manual-area" id="manual-area">
+    <form class="manual-area" id="manual-area" autocomplete="off" onsubmit="return false;">
       <label class="modal-label">Receptnamn</label>
-      <input class="modal-input" id="recipe-name-input" placeholder="t.ex. Pasta Carbonara" autocomplete="off" autocorrect="off" autocapitalize="sentences" />
+      <input class="modal-input" id="recipe-name-input" placeholder="t.ex. Pasta Carbonara" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" />
       <label class="modal-label">Emoji</label>
-      <input class="modal-input" id="recipe-emoji-input" placeholder="🍝" style="font-size:1.3rem;width:70px;" autocomplete="off" autocorrect="off" autocapitalize="off" />
+      <input class="modal-input" id="recipe-emoji-input" placeholder="🍝" style="font-size:1.3rem;width:70px;" autocomplete="new-password" autocorrect="off" autocapitalize="off" />
       <label class="modal-label">Tid & portioner</label>
-      <input class="modal-input" id="recipe-meta-input" placeholder="t.ex. 30 min · 4 portioner" autocomplete="off" autocorrect="off" autocapitalize="off" />
+      <input class="modal-input" id="recipe-meta-input" placeholder="t.ex. 30 min · 4 portioner" autocomplete="new-password" autocorrect="off" autocapitalize="off" />
       <label class="modal-label">Kategori</label>
-      <input class="modal-input" id="recipe-tag-input" placeholder="t.ex. Pasta, Familj, Soppa..." autocomplete="off" autocorrect="off" autocapitalize="sentences" />
+      <input class="modal-input" id="recipe-tag-input" placeholder="t.ex. Pasta, Familj, Soppa..." autocomplete="new-password" autocorrect="off" autocapitalize="sentences" />
       <label class="modal-label">Ingredienser (en per rad)</label>
-      <textarea class="modal-textarea" id="recipe-ingredients-input" placeholder="200g pasta&#10;2 ägg&#10;100g parmesan&#10;guanciale" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false"></textarea>
+      <textarea class="modal-textarea" id="recipe-ingredients-input" placeholder="200g pasta&#10;2 ägg&#10;100g parmesan&#10;guanciale" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" spellcheck="false"></textarea>
       <label class="modal-label">Steg (ett per rad)</label>
-      <textarea class="modal-textarea" id="recipe-steps-input" placeholder="Koka pasta al dente&#10;Blanda ägg och ost&#10;Blanda allt utanför plattan" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false"></textarea>
-    </div>
+      <textarea class="modal-textarea" id="recipe-steps-input" placeholder="Koka pasta al dente&#10;Blanda ägg och ost&#10;Blanda allt utanför plattan" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" spellcheck="false"></textarea>
+    </form>
 
-    <button class="modal-save-btn" id="modal-save-btn">Spara recept</button>
+    <button class="modal-save-btn" id="modal-save-btn" type="button">Spara recept</button>
   </div>
 </div>
 
