@@ -2279,6 +2279,23 @@ document.getElementById('account-signout').addEventListener('click', async () =>
   showAuthScreen();
 });
 
+// ── SUPPRESS CHROME AUTOFILL BAR ──
+// Chrome Android ignores autocomplete="off". The reliable fix is to keep
+// inputs as readonly — Chrome won't show autofill on readonly fields.
+// We remove readonly the instant the user focuses, so they can still type.
+// On blur we restore readonly so the next focus is also autofill-free.
+[
+  'grocery-input', 'recipe-search', 'household-input',
+  'recipe-name-input', 'recipe-emoji-input', 'recipe-meta-input',
+  'recipe-tag-input', 'recipe-ingredients-input', 'recipe-steps-input'
+].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.setAttribute('readonly', 'readonly');
+  el.addEventListener('focus', function() { this.removeAttribute('readonly'); });
+  el.addEventListener('blur',  function() { this.setAttribute('readonly', 'readonly'); });
+});
+
 // ── ANDROID BACK GESTURE ──
 // Whenever a modal opens we push a history state.
 // The popstate event fires when the user swipes back (Android) or presses
