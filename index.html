@@ -1213,6 +1213,7 @@
   <div class="detail-top">
     <button class="detail-back" id="detail-back">←</button>
     <div style="display:flex;gap:8px;align-items:center;">
+      <button class="detail-add-grocery" id="detail-edit-btn">✏️ Redigera</button>
       <button class="detail-add-grocery" id="detail-add-grocery">+ Inköpslista</button>
       <button class="detail-add-grocery" id="detail-cook-btn" style="background:var(--orange);color:#fff;">👨‍🍳 Laga</button>
     </div>
@@ -1311,23 +1312,10 @@ db.from('households').select('count', { count: 'exact', head: true })
 
 // ── STATE ──
 let groceryItems = [];
-let recipes = JSON.parse(localStorage.getItem('mk-recipes') || '[]');
+let recipes = [];
 let activeFilter = 'all';
 let currentRecipe = null;
 let addMode = 'manual';
-
-// ── Default recipes ──
-if (recipes.length === 0) {
-  recipes = [
-    { id: 1, name: 'Pasta Carbonara', emoji: '🍝', meta: '30 min · 4 servings', tag: 'Pasta', ingredients: ['200g spaghetti', '150g guanciale', '3 eggs', '80g pecorino romano', 'Black pepper'], steps: ['Boil pasta in salted water until al dente.', 'Fry guanciale until crispy.', 'Mix eggs and grated pecorino in a bowl.', 'Drain pasta, combine with guanciale off heat.', 'Add egg mixture, toss quickly. Season with black pepper.'] },
-    { id: 2, name: 'Mormors köttbullar', emoji: '🥘', meta: '45 min · 6 servings', tag: 'Family', ingredients: ['500g minced meat', '1 onion', '1 egg', '3 tbsp breadcrumbs', '2 tbsp milk', 'Salt, pepper, allspice'], steps: ['Mix all ingredients gently until combined.', 'Roll into small balls with wet hands.', 'Fry in butter on medium heat until golden.', 'Make a cream sauce with the pan drippings.', 'Serve with mashed potatoes and lingonberry jam.'] },
-    { id: 3, name: 'Linssoppa', emoji: '🍲', meta: '25 min · 4 servings', tag: 'Veggie', ingredients: ['300g red lentils', '1 onion', '2 garlic cloves', '1 can tomatoes', '1 tsp cumin', 'Vegetable broth'], steps: ['Sauté onion and garlic until soft.', 'Add cumin and toast 1 minute.', 'Add lentils, tomatoes, and broth.', 'Simmer 20 minutes until lentils are soft.', 'Season and serve with crusty bread.'] }
-  ];
-  saveRecipes();
-}
-
-// ── UTILS ──
-function saveRecipes() { localStorage.setItem('mk-recipes', JSON.stringify(recipes)); }
 
 // ── SUPABASE GROCERY SYNC ──
 let groceryChannel = null;
@@ -1391,6 +1379,142 @@ function subscribeToGrocery() {
       }
     })
     .subscribe();
+}
+
+// ── SUPABASE RECIPE SYNC ──
+let recipesChannel = null;
+
+// Converts a Supabase recipe row (with nested ingredients/steps) to our app format
+function mapRecipe(row) {
+  return {
+    id: row.id,
+    household_id: row.household_id,
+    name: row.name,
+    emoji: row.emoji || '🍽',
+    meta: row.meta || '',
+    tag: row.tag || '',
+    created_by: row.created_by,
+    ingredients: (row.recipe_ingredients || [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(i => i.text),
+    steps: (row.recipe_steps || [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(s => s.text)
+  };
+}
+
+async function loadRecipes() {
+  const { data, error } = await db
+    .from('recipes')
+    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)')
+    .eq('household_id', currentHousehold.id)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('Error loading recipes:', error.message); return; }
+  recipes = (data || []).map(mapRecipe);
+  renderRecipes();
+}
+
+async function fetchOneRecipe(id) {
+  const { data, error } = await db
+    .from('recipes')
+    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)')
+    .eq('id', id)
+    .single();
+  if (error || !data) return null;
+  return mapRecipe(data);
+}
+
+function subscribeToRecipes() {
+  if (recipesChannel) recipesChannel.unsubscribe();
+  recipesChannel = db.channel('recipes-' + currentHousehold.id)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'recipes',
+      filter: `household_id=eq.${currentHousehold.id}`
+    }, async (payload) => {
+      if (payload.eventType === 'INSERT') {
+        // Only add if we don't already have it (avoid duplicates)
+        if (!recipes.find(r => r.id === payload.new.id)) {
+          const recipe = await fetchOneRecipe(payload.new.id);
+          if (recipe) { recipes.unshift(recipe); renderRecipes(); }
+        }
+      } else if (payload.eventType === 'DELETE') {
+        recipes = recipes.filter(r => r.id !== payload.old.id);
+        renderRecipes();
+      } else if (payload.eventType === 'UPDATE') {
+        // Wait briefly so ingredient/step changes are committed before re-fetching
+        setTimeout(async () => {
+          const recipe = await fetchOneRecipe(payload.new.id);
+          if (!recipe) return;
+          const idx = recipes.findIndex(r => r.id === recipe.id);
+          if (idx !== -1) recipes[idx] = recipe;
+          // If the detail view is open for this recipe, refresh it live
+          if (currentRecipe?.id === recipe.id) {
+            currentRecipe = recipe;
+            openRecipeDetail(recipe);
+          }
+          renderRecipes();
+        }, 300);
+      }
+    })
+    .subscribe();
+}
+
+async function addRecipeToDB(recipeData) {
+  const { data: newRecipe, error } = await db
+    .from('recipes')
+    .insert({
+      household_id: currentHousehold.id,
+      name: recipeData.name,
+      emoji: recipeData.emoji,
+      meta: recipeData.meta,
+      tag: recipeData.tag,
+      created_by: currentUser.id
+    })
+    .select()
+    .single();
+  if (error) { console.error('Error saving recipe:', error.message); return null; }
+
+  if (recipeData.ingredients.length > 0) {
+    await db.from('recipe_ingredients').insert(
+      recipeData.ingredients.map((text, i) => ({ recipe_id: newRecipe.id, text, sort_order: i }))
+    );
+  }
+  if (recipeData.steps.length > 0) {
+    await db.from('recipe_steps').insert(
+      recipeData.steps.map((text, i) => ({ recipe_id: newRecipe.id, text, sort_order: i }))
+    );
+  }
+  return newRecipe.id;
+}
+
+async function updateRecipeInDB(id, recipeData) {
+  // Update ingredients and steps first, THEN the recipe row —
+  // so when the real-time subscription fires, the fresh ingredients/steps are already in place
+  await db.from('recipe_ingredients').delete().eq('recipe_id', id);
+  await db.from('recipe_steps').delete().eq('recipe_id', id);
+
+  if (recipeData.ingredients.length > 0) {
+    await db.from('recipe_ingredients').insert(
+      recipeData.ingredients.map((text, i) => ({ recipe_id: id, text, sort_order: i }))
+    );
+  }
+  if (recipeData.steps.length > 0) {
+    await db.from('recipe_steps').insert(
+      recipeData.steps.map((text, i) => ({ recipe_id: id, text, sort_order: i }))
+    );
+  }
+
+  const { error } = await db.from('recipes').update({
+    name: recipeData.name,
+    emoji: recipeData.emoji,
+    meta: recipeData.meta,
+    tag: recipeData.tag
+  }).eq('id', id);
+
+  if (error) { console.error('Error updating recipe:', error.message); return false; }
+  return true;
 }
 
 function showToast(msg) {
@@ -1681,6 +1805,10 @@ function openRecipeDetail(recipe) {
       el.querySelector('.detail-step-check').textContent = el.classList.contains('done') ? '✓' : '';
     });
   });
+  // Only show the edit button if this recipe belongs to the current user
+  document.getElementById('detail-edit-btn').style.display =
+    recipe.created_by === currentUser?.id ? '' : 'none';
+
   pushModalHistory();
   document.getElementById('detail-modal').classList.add('open');
 }
@@ -1748,22 +1876,60 @@ document.getElementById('ingredient-modal').addEventListener('click', e => {
   }
 });
 
-// ── ADD RECIPE MODAL ──
+// ── ADD / EDIT RECIPE MODAL ──
+let editingRecipeId = null;
+
+const MODAL_FIELDS = ['recipe-name-input','recipe-emoji-input','recipe-meta-input','recipe-tag-input','recipe-ingredients-input','recipe-steps-input'];
+
+function resetAddModal() {
+  editingRecipeId = null;
+  document.querySelector('#add-modal .modal-title').textContent = 'Lägg till recept';
+  document.getElementById('modal-save-btn').textContent = 'Spara recept';
+  MODAL_FIELDS.forEach(id => document.getElementById(id).value = '');
+}
+
+function openEditModal(recipe) {
+  editingRecipeId = recipe.id;
+  document.querySelector('#add-modal .modal-title').textContent = 'Redigera recept';
+  document.getElementById('modal-save-btn').textContent = 'Spara ändringar';
+  document.getElementById('recipe-name-input').value = recipe.name || '';
+  document.getElementById('recipe-emoji-input').value = recipe.emoji || '';
+  document.getElementById('recipe-meta-input').value = recipe.meta || '';
+  document.getElementById('recipe-tag-input').value = recipe.tag || '';
+  document.getElementById('recipe-ingredients-input').value = (recipe.ingredients || []).join('\n');
+  document.getElementById('recipe-steps-input').value = (recipe.steps || []).join('\n');
+  pushModalHistory();
+  document.getElementById('add-modal').classList.add('open');
+}
+
+document.getElementById('detail-edit-btn').addEventListener('click', () => {
+  if (!currentRecipe) return;
+  openEditModal(currentRecipe);
+});
+
 document.getElementById('recipe-add-btn').addEventListener('click', () => {
+  resetAddModal();
   pushModalHistory();
   document.getElementById('add-modal').classList.add('open');
 });
+
 document.getElementById('add-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('add-modal')) {
+    resetAddModal();
     document.getElementById('add-modal').classList.remove('open');
   }
 });
 
-document.getElementById('modal-save-btn').addEventListener('click', () => {
+document.getElementById('modal-save-btn').addEventListener('click', async () => {
   const name = document.getElementById('recipe-name-input').value.trim();
   if (!name) { showToast('Lägg till ett receptnamn'); return; }
-  const recipe = {
-    id: Date.now(),
+
+  const btn = document.getElementById('modal-save-btn');
+  const originalText = btn.textContent;
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  const recipeData = {
     name,
     emoji: document.getElementById('recipe-emoji-input').value.trim() || '🍽',
     meta: document.getElementById('recipe-meta-input').value.trim() || '— min',
@@ -1771,12 +1937,30 @@ document.getElementById('modal-save-btn').addEventListener('click', () => {
     ingredients: document.getElementById('recipe-ingredients-input').value.trim().split('\n').filter(Boolean),
     steps: document.getElementById('recipe-steps-input').value.trim().split('\n').filter(Boolean)
   };
-  recipes.unshift(recipe);
-  saveRecipes();
-  renderRecipes();
-  document.getElementById('add-modal').classList.remove('open');
-  ['recipe-name-input','recipe-emoji-input','recipe-meta-input','recipe-tag-input','recipe-ingredients-input','recipe-steps-input'].forEach(id => document.getElementById(id).value = '');
-  showToast('Recept sparat! 🎉');
+
+  if (editingRecipeId !== null) {
+    const ok = await updateRecipeInDB(editingRecipeId, recipeData);
+    if (ok) {
+      document.getElementById('add-modal').classList.remove('open');
+      resetAddModal();
+      showToast('Recept uppdaterat! ✏️');
+    } else {
+      showToast('Kunde inte uppdatera receptet 😕');
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  } else {
+    const newId = await addRecipeToDB(recipeData);
+    if (newId) {
+      document.getElementById('add-modal').classList.remove('open');
+      resetAddModal();
+      showToast('Recept sparat! 🎉');
+    } else {
+      showToast('Kunde inte spara receptet 😕');
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  }
 });
 
 // ── COOKING MODE ──
@@ -1997,7 +2181,8 @@ async function checkHousehold() {
       switchTab('grocery');
       await loadGrocery();
       subscribeToGrocery();
-      renderRecipes();
+      await loadRecipes();
+      subscribeToRecipes();
       return;
     }
   }
@@ -2084,10 +2269,12 @@ document.getElementById('account-invite-code').addEventListener('click', () => {
 document.getElementById('account-signout').addEventListener('click', async () => {
   await db.auth.signOut();
   if (groceryChannel) { groceryChannel.unsubscribe(); groceryChannel = null; }
+  if (recipesChannel) { recipesChannel.unsubscribe(); recipesChannel = null; }
   currentUser = null;
   currentHousehold = null;
   currentGroceryListId = null;
   groceryItems = [];
+  recipes = [];
   document.getElementById('account-panel').classList.remove('open');
   showAuthScreen();
 });
@@ -2107,7 +2294,7 @@ window.addEventListener('popstate', () => {
   const modals = [
     { id: 'cooking-modal',    close: closeCookingMode },
     { id: 'ingredient-modal', close: () => document.getElementById('ingredient-modal').classList.remove('open') },
-    { id: 'add-modal',        close: () => document.getElementById('add-modal').classList.remove('open') },
+    { id: 'add-modal',        close: () => { document.getElementById('add-modal').classList.remove('open'); resetAddModal(); } },
     { id: 'detail-modal',     close: () => document.getElementById('detail-modal').classList.remove('open') },
     { id: 'account-panel',   close: () => document.getElementById('account-panel').classList.remove('open') },
   ];
