@@ -1493,7 +1493,7 @@ async function addRecipeToDB(recipeData) {
     })
     .select()
     .single();
-  if (error) { console.error('Error saving recipe:', error.message); showToast('Fel: ' + error.message); return null; }
+  if (error) { console.error('Error saving recipe:', error.message); return { error: error.message }; }
 
   if (recipeData.ingredients.length > 0) {
     await db.from('recipe_ingredients').insert(
@@ -2050,8 +2050,12 @@ document.getElementById('modal-save-btn').addEventListener('click', async () => 
       btn.disabled = false;
     }
   } else {
-    const newId = await addRecipeToDB(recipeData);
-    if (newId) {
+    const result = await addRecipeToDB(recipeData);
+    if (result?.error) {
+      showToast('Fel: ' + result.error);
+      btn.textContent = originalText;
+      btn.disabled = false;
+    } else if (result) {
       document.getElementById('add-modal').classList.remove('open');
       resetAddModal();
       showToast('Recept sparat! 🎉');
