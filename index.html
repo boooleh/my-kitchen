@@ -36,6 +36,8 @@
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
 
   body {
     font-family: 'Plus Jakarta Sans', sans-serif;
@@ -1140,7 +1142,7 @@
         <div class="grocery-sub" id="grocery-count">0 varor</div>
       </div>
       <form class="grocery-add" autocomplete="off" onsubmit="return false;">
-        <input class="grocery-input" id="grocery-input" type="text" autocomplete="new-password" autocorrect="off" placeholder="Lägg till en vara..." />
+        <input class="grocery-input" id="grocery-input" type="search" autocomplete="new-password" autocorrect="off" placeholder="Lägg till en vara..." />
         <button class="add-btn" id="grocery-add-btn" type="button">+</button>
       </form>
       <div class="section-label" id="grocery-section-label">Varor</div>
@@ -1192,13 +1194,13 @@
 
     <form class="manual-area" id="manual-area" autocomplete="off" onsubmit="return false;">
       <label class="modal-label">Receptnamn</label>
-      <input class="modal-input" id="recipe-name-input" placeholder="t.ex. Pasta Carbonara" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" />
+      <input class="modal-input" id="recipe-name-input" type="search" placeholder="t.ex. Pasta Carbonara" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" />
       <label class="modal-label">Emoji</label>
-      <input class="modal-input" id="recipe-emoji-input" placeholder="🍝" style="font-size:1.3rem;width:70px;" autocomplete="new-password" autocorrect="off" autocapitalize="off" />
+      <input class="modal-input" id="recipe-emoji-input" type="search" placeholder="🍝" style="font-size:1.3rem;width:70px;" autocomplete="new-password" autocorrect="off" autocapitalize="off" />
       <label class="modal-label">Tid & portioner</label>
-      <input class="modal-input" id="recipe-meta-input" placeholder="t.ex. 30 min · 4 portioner" autocomplete="new-password" autocorrect="off" autocapitalize="off" />
+      <input class="modal-input" id="recipe-meta-input" type="search" placeholder="t.ex. 30 min · 4 portioner" autocomplete="new-password" autocorrect="off" autocapitalize="off" />
       <label class="modal-label">Kategori</label>
-      <input class="modal-input" id="recipe-tag-input" placeholder="t.ex. Pasta, Familj, Soppa..." autocomplete="new-password" autocorrect="off" autocapitalize="sentences" />
+      <input class="modal-input" id="recipe-tag-input" type="search" placeholder="t.ex. Pasta, Familj, Soppa..." autocomplete="new-password" autocorrect="off" autocapitalize="sentences" />
       <label class="modal-label">Ingredienser (en per rad)</label>
       <textarea class="modal-textarea" id="recipe-ingredients-input" placeholder="200g pasta&#10;2 ägg&#10;100g parmesan&#10;guanciale" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" spellcheck="false"></textarea>
       <label class="modal-label">Steg (ett per rad)</label>
@@ -1486,11 +1488,12 @@ async function addRecipeToDB(recipeData) {
       emoji: recipeData.emoji,
       meta: recipeData.meta,
       tag: recipeData.tag,
-      created_by: currentUser.id
+      created_by: currentUser.id,
+      is_public: false
     })
     .select()
     .single();
-  if (error) { console.error('Error saving recipe:', error.message); return null; }
+  if (error) { console.error('Error saving recipe:', error.message); showToast('Fel: ' + error.message); return null; }
 
   if (recipeData.ingredients.length > 0) {
     await db.from('recipe_ingredients').insert(
