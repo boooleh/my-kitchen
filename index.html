@@ -1626,7 +1626,8 @@ function renderRecipes() {
       (activeFilter === 'quick' && r.meta.includes('min') && parseInt(r.meta) <= 30) ||
       (activeFilter === 'family' && r.tag.toLowerCase().includes('family')) ||
       (activeFilter === 'veggie' && (r.tag.toLowerCase().includes('veggie') || r.tag.toLowerCase().includes('veg')));
-    const matchSearch = r.name.toLowerCase().includes(search);
+    const matchSearch = r.name.toLowerCase().includes(search) ||
+      r.tag.toLowerCase().includes(search);
     return matchFilter && matchSearch;
   });
 
