@@ -1083,7 +1083,7 @@
     </button>
   </div>
   <div class="household-form" id="household-form" style="display:none;">
-    <input class="auth-input" id="household-input" placeholder="" />
+    <input class="auth-input" id="household-input" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="off" />
     <div class="auth-error" id="household-error"></div>
     <button class="auth-btn" id="household-submit">Fortsätt</button>
   </div>
@@ -1164,7 +1164,7 @@
       </div>
       <div class="recipe-search">
         <span>🔍</span>
-        <input id="recipe-search" placeholder="Sök recept..." />
+        <input id="recipe-search" placeholder="Sök recept..." autocomplete="off" autocorrect="off" autocapitalize="off" />
       </div>
       <div class="recipe-filters" id="recipe-filters">
         <button class="filter-chip active" data-filter="all">Alla</button>
@@ -1191,17 +1191,17 @@
 
     <div class="manual-area" id="manual-area">
       <label class="modal-label">Receptnamn</label>
-      <input class="modal-input" id="recipe-name-input" placeholder="t.ex. Pasta Carbonara" />
+      <input class="modal-input" id="recipe-name-input" placeholder="t.ex. Pasta Carbonara" autocomplete="off" autocorrect="off" autocapitalize="sentences" />
       <label class="modal-label">Emoji</label>
-      <input class="modal-input" id="recipe-emoji-input" placeholder="🍝" style="font-size:1.3rem;width:70px;" />
+      <input class="modal-input" id="recipe-emoji-input" placeholder="🍝" style="font-size:1.3rem;width:70px;" autocomplete="off" autocorrect="off" autocapitalize="off" />
       <label class="modal-label">Tid & portioner</label>
-      <input class="modal-input" id="recipe-meta-input" placeholder="t.ex. 30 min · 4 portioner" />
+      <input class="modal-input" id="recipe-meta-input" placeholder="t.ex. 30 min · 4 portioner" autocomplete="off" autocorrect="off" autocapitalize="off" />
       <label class="modal-label">Kategori</label>
-      <input class="modal-input" id="recipe-tag-input" placeholder="t.ex. Pasta, Familj, Soppa..." />
+      <input class="modal-input" id="recipe-tag-input" placeholder="t.ex. Pasta, Familj, Soppa..." autocomplete="off" autocorrect="off" autocapitalize="sentences" />
       <label class="modal-label">Ingredienser (en per rad)</label>
-      <textarea class="modal-textarea" id="recipe-ingredients-input" placeholder="200g pasta&#10;2 ägg&#10;100g parmesan&#10;guanciale"></textarea>
+      <textarea class="modal-textarea" id="recipe-ingredients-input" placeholder="200g pasta&#10;2 ägg&#10;100g parmesan&#10;guanciale" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false"></textarea>
       <label class="modal-label">Steg (ett per rad)</label>
-      <textarea class="modal-textarea" id="recipe-steps-input" placeholder="Koka pasta al dente&#10;Blanda ägg och ost&#10;Blanda allt utanför plattan"></textarea>
+      <textarea class="modal-textarea" id="recipe-steps-input" placeholder="Koka pasta al dente&#10;Blanda ägg och ost&#10;Blanda allt utanför plattan" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false"></textarea>
     </div>
 
     <button class="modal-save-btn" id="modal-save-btn">Spara recept</button>
@@ -1680,6 +1680,7 @@ function openRecipeDetail(recipe) {
       el.querySelector('.detail-step-check').textContent = el.classList.contains('done') ? '✓' : '';
     });
   });
+  pushModalHistory();
   document.getElementById('detail-modal').classList.add('open');
 }
 
@@ -1694,6 +1695,7 @@ document.getElementById('detail-add-grocery').addEventListener('click', () => {
   if (!currentRecipe) return;
   ingredientSelection = (currentRecipe.ingredients || []).map(() => true); // all selected by default
   renderIngredientPicker();
+  pushModalHistory();
   document.getElementById('ingredient-modal').classList.add('open');
 });
 
@@ -1747,6 +1749,7 @@ document.getElementById('ingredient-modal').addEventListener('click', e => {
 
 // ── ADD RECIPE MODAL ──
 document.getElementById('recipe-add-btn').addEventListener('click', () => {
+  pushModalHistory();
   document.getElementById('add-modal').classList.add('open');
 });
 document.getElementById('add-modal').addEventListener('click', e => {
@@ -1806,6 +1809,7 @@ async function openCookingMode(recipe) {
 
   document.getElementById('cooking-body').style.display = 'grid';
   document.getElementById('cooking-done').classList.remove('visible');
+  pushModalHistory();
   document.getElementById('cooking-modal').classList.add('open');
   renderCookingStep(recipe);
 
@@ -2061,6 +2065,7 @@ function updateAccountPanel() {
 }
 
 document.querySelector('.avatar-btn').addEventListener('click', () => {
+  pushModalHistory();
   document.getElementById('account-panel').classList.add('open');
 });
 
@@ -2084,6 +2089,34 @@ document.getElementById('account-signout').addEventListener('click', async () =>
   groceryItems = [];
   document.getElementById('account-panel').classList.remove('open');
   showAuthScreen();
+});
+
+// ── ANDROID BACK GESTURE ──
+// Whenever a modal opens we push a history state.
+// The popstate event fires when the user swipes back (Android) or presses
+// the hardware/gesture back button — we intercept it and close the modal
+// instead of letting the browser navigate away from the app.
+
+function pushModalHistory() {
+  history.pushState({ isModal: true }, '');
+}
+
+window.addEventListener('popstate', () => {
+  // Close the topmost open modal, in priority order
+  const modals = [
+    { id: 'cooking-modal',    close: closeCookingMode },
+    { id: 'ingredient-modal', close: () => document.getElementById('ingredient-modal').classList.remove('open') },
+    { id: 'add-modal',        close: () => document.getElementById('add-modal').classList.remove('open') },
+    { id: 'detail-modal',     close: () => document.getElementById('detail-modal').classList.remove('open') },
+    { id: 'account-panel',   close: () => document.getElementById('account-panel').classList.remove('open') },
+  ];
+  for (const { id, close } of modals) {
+    if (document.getElementById(id)?.classList.contains('open')) {
+      close();
+      return;
+    }
+  }
+  // No modal was open — let the browser handle it normally (navigate back)
 });
 
 // Init — check if already logged in
