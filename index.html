@@ -1187,6 +1187,8 @@
     border-radius: 28px 28px 0 0;
     padding: 28px 24px 40px;
     width: 100%; max-width: 430px;
+    max-height: 85vh;
+    overflow-y: auto;
     animation: slideUp 0.4s var(--ease-spring);
   }
   .account-handle { width: 36px; height: 4px; background: var(--gray-2); border-radius: 2px; margin: 0 auto 24px; }
@@ -1206,6 +1208,95 @@
     transition: background 0.15s, color 0.15s;
   }
   .account-signout:hover { background: var(--gray-2); color: var(--black); }
+
+  /* ── AVATAR PICKER ── */
+  .account-avatar-hero {
+    display: flex; align-items: center;
+    gap: 14px; margin-bottom: 16px;
+  }
+  .account-avatar-circle {
+    width: 60px; height: 60px;
+    background: var(--orange-light);
+    border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+    border: 3px solid var(--orange-mid);
+  }
+  .avatar-toggle-btn {
+    background: none; border: none; padding: 0;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.8rem; color: var(--orange);
+    font-weight: 600; cursor: pointer;
+    text-align: left; margin-top: 4px;
+  }
+  .avatar-grid-wrapper {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.3s var(--ease-out);
+    margin-bottom: 0;
+  }
+  .avatar-grid-wrapper.open {
+    max-height: 130px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+  }
+  .avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px; padding-top: 4px;
+  }
+  .avatar-option {
+    aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; border-radius: 50%;
+    border: 2px solid transparent;
+    background: var(--gray-1);
+    cursor: pointer; transition: all 0.1s;
+  }
+  .avatar-option.selected { border-color: var(--orange); background: var(--orange-light); }
+  .avatar-option:hover { background: var(--gray-2); }
+  .avatar-section-label {
+    font-size: 0.78rem; color: var(--gray-4);
+    font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; margin-bottom: 2px;
+  }
+
+  /* Name edit field */
+  .account-name-row {
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--gray-2);
+    margin-bottom: 4px;
+  }
+  .account-name-input {
+    flex: 1; border: none; background: transparent;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.92rem; font-weight: 600; color: var(--black);
+    outline: none; min-width: 0;
+  }
+  .account-name-input::placeholder { color: var(--gray-3); font-weight: 400; }
+  .account-name-save {
+    background: var(--orange); color: white; border: none;
+    border-radius: var(--radius-sm); padding: 6px 12px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s; flex-shrink: 0;
+  }
+  .account-name-save:hover { background: #e85a24; }
+
+  /* Household members */
+  .members-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+  .member-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+  }
+  .member-avatar {
+    width: 36px; height: 36px;
+    background: var(--orange-light); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; flex-shrink: 0;
+  }
+  .member-name { font-size: 0.88rem; font-weight: 600; color: var(--black); }
+  .member-you { font-size: 0.75rem; color: var(--orange); margin-left: 4px; }
+  .member-role { font-size: 0.75rem; color: var(--gray-4); margin-top: 1px; }
 </style>
 </head>
 <body>
@@ -1260,17 +1351,38 @@
 <div class="account-panel" id="account-panel">
   <div class="account-sheet">
     <div class="account-handle"></div>
-    <div class="account-title">Mitt konto</div>
+
+    <!-- Avatar hero + name -->
+    <div class="account-avatar-hero">
+      <div class="account-avatar-circle" id="account-avatar-display">👩</div>
+      <div style="flex:1;">
+        <div class="account-name-row">
+          <input class="account-name-input" id="account-name-input" type="text" placeholder="Ditt namn..." autocomplete="off" autocorrect="off" autocapitalize="words" />
+          <button class="account-name-save" id="account-name-save">Spara</button>
+        </div>
+        <button class="avatar-toggle-btn" id="avatar-toggle-btn">Ändra avatar ›</button>
+      </div>
+    </div>
+
+    <!-- Avatar emoji picker (collapsed by default) -->
+    <div class="avatar-grid-wrapper" id="avatar-grid-wrapper">
+      <div class="avatar-grid" id="avatar-grid"></div>
+    </div>
+
+    <div style="height:16px;"></div>
+
+    <!-- Household members -->
+    <div class="avatar-section-label">Hushållets medlemmar</div>
+    <div class="members-list" id="members-list">
+      <div style="color:var(--gray-3);font-size:0.85rem;padding:8px 0;">Laddar...</div>
+    </div>
+
+    <div style="height:8px;"></div>
+
     <div class="account-row">
       <div>
         <div class="account-row-label">E-post</div>
         <div class="account-row-value" id="account-email">—</div>
-      </div>
-    </div>
-    <div class="account-row">
-      <div>
-        <div class="account-row-label">Hushåll</div>
-        <div class="account-row-value" id="account-household">—</div>
       </div>
     </div>
     <div class="account-row">
@@ -2742,15 +2854,111 @@ document.getElementById('household-submit').addEventListener('click', async () =
   btn.disabled = false;
 });
 
+// ── AVATAR & PROFILE ──
+const AVATAR_EMOJIS = [
+  '👩','👨','🧑','👧','👦','👴','👵',
+  '👩‍🦱','👨‍🦱','👩‍🦰','👨‍🦰','👩‍🦳','👨‍🦳','👩‍🦲','👨‍🦲',
+  '🧕','🎅','🤶','🧙‍♀️','🧙‍♂️','🦸‍♀️','🦸‍♂️','🧚‍♀️',
+  '🐱','🐶','🦊','🐸','🐼','🐨','🦁','🐯','🦄','🦝','🐰','🐻','🐮','🐷',
+  '🌟','🌈','🎨','🌸','🦋','🍄','🎸','🍕'
+];
+
+let currentUserAvatar = '👩';
+
+function updateAvatarDisplays(emoji) {
+  currentUserAvatar = emoji;
+  document.querySelector('.avatar-btn').textContent = emoji;
+  document.getElementById('account-avatar-display').textContent = emoji;
+  document.querySelectorAll('.avatar-option').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.emoji === emoji);
+  });
+}
+
+document.getElementById('avatar-toggle-btn').addEventListener('click', () => {
+  const wrapper = document.getElementById('avatar-grid-wrapper');
+  const btn = document.getElementById('avatar-toggle-btn');
+  const isOpen = wrapper.classList.toggle('open');
+  btn.textContent = isOpen ? 'Stäng ›' : 'Ändra avatar ›';
+  if (isOpen) initAvatarPicker();
+});
+
+function initAvatarPicker() {
+  const grid = document.getElementById('avatar-grid');
+  grid.innerHTML = '';
+  AVATAR_EMOJIS.forEach(em => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'avatar-option' + (em === currentUserAvatar ? ' selected' : '');
+    btn.dataset.emoji = em;
+    btn.textContent = em;
+    btn.addEventListener('click', async () => {
+      updateAvatarDisplays(em);
+      await db.from('profiles').upsert({ id: currentUser.id, avatar: em, updated_at: new Date().toISOString() });
+      showToast('Avatar uppdaterad!');
+    });
+    grid.appendChild(btn);
+  });
+}
+
+async function loadProfile() {
+  if (!currentUser) return;
+  const { data } = await db.from('profiles').select('display_name, avatar').eq('id', currentUser.id).maybeSingle();
+  const avatar = data?.avatar || '👩';
+  const name = data?.display_name || '';
+  updateAvatarDisplays(avatar);
+  document.getElementById('account-name-input').value = name;
+}
+
+async function loadHouseholdMembers() {
+  if (!currentHousehold) return;
+  const { data, error } = await db
+    .from('household_members')
+    .select('user_id, role, profiles(display_name, avatar)')
+    .eq('household_id', currentHousehold.id);
+  if (error || !data) return;
+
+  const list = document.getElementById('members-list');
+  list.innerHTML = '';
+  data.forEach(member => {
+    const isYou = member.user_id === currentUser.id;
+    const avatar = member.profiles?.avatar || '👩';
+    const name = member.profiles?.display_name || (isYou ? 'Du' : 'Medlem');
+    const roleLabel = member.role === 'owner' ? 'Ägare' : 'Medlem';
+    const el = document.createElement('div');
+    el.className = 'member-row';
+    el.innerHTML = `
+      <div class="member-avatar">${avatar}</div>
+      <div>
+        <div class="member-name">${name}${isYou ? '<span class="member-you">(du)</span>' : ''}</div>
+        <div class="member-role">${roleLabel}</div>
+      </div>`;
+    list.appendChild(el);
+  });
+}
+
+// Save name
+document.getElementById('account-name-save').addEventListener('click', async () => {
+  const name = document.getElementById('account-name-input').value.trim();
+  const btn = document.getElementById('account-name-save');
+  btn.textContent = '...'; btn.disabled = true;
+  await db.from('profiles').upsert({ id: currentUser.id, display_name: name, updated_at: new Date().toISOString() });
+  btn.textContent = 'Sparat ✓'; btn.disabled = false;
+  setTimeout(() => { btn.textContent = 'Spara'; }, 2000);
+  showToast('Namn sparat!');
+});
+
 // Account panel
 function updateAccountPanel() {
   if (!currentUser || !currentHousehold) return;
   document.getElementById('account-email').textContent = currentUser.email;
-  document.getElementById('account-household').textContent = currentHousehold.name;
   document.getElementById('account-invite-code').textContent = currentHousehold.invite_code;
+  loadProfile();
+  loadHouseholdMembers();
 }
 
 document.querySelector('.avatar-btn').addEventListener('click', () => {
+  initAvatarPicker();
+  loadHouseholdMembers();
   pushModalHistory();
   document.getElementById('account-panel').classList.add('open');
 });
@@ -2758,6 +2966,8 @@ document.querySelector('.avatar-btn').addEventListener('click', () => {
 document.getElementById('account-panel').addEventListener('click', (e) => {
   if (e.target === document.getElementById('account-panel')) {
     document.getElementById('account-panel').classList.remove('open');
+    document.getElementById('avatar-grid-wrapper').classList.remove('open');
+    document.getElementById('avatar-toggle-btn').textContent = 'Ändra avatar ›';
   }
 });
 
