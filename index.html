@@ -1370,8 +1370,8 @@
           <div class="emoji-grid" id="emoji-grid"></div>
         </div>
         <div class="img-tab-panel" id="panel-photo">
+          <input type="file" id="recipe-image-input" accept="image/*" style="display:none">
           <div class="photo-upload-area" id="photo-upload-area">
-            <input type="file" id="recipe-image-input" accept="image/*" style="display:none">
             <div class="photo-upload-icon">📷</div>
             <div class="photo-upload-hint">Tryck för att välja ett foto</div>
           </div>
@@ -2329,6 +2329,13 @@ async function uploadRecipeImage(file, recipeId) {
   return data.publicUrl + '?t=' + Date.now();
 }
 
+function resetPhotoArea() {
+  const area = document.getElementById('photo-upload-area');
+  area.classList.remove('has-image');
+  area.innerHTML = `<div class="photo-upload-icon">📷</div><div class="photo-upload-hint">Tryck för att välja ett foto</div>`;
+  document.getElementById('recipe-image-input').value = '';
+}
+
 function resetAddModal() {
   editingRecipeId = null;
   selectedEmoji = '🍽';
@@ -2336,27 +2343,7 @@ function resetAddModal() {
   document.querySelector('#add-modal .modal-title').textContent = 'Lägg till recept';
   document.getElementById('modal-save-btn').textContent = 'Spara recept';
   MODAL_FIELDS.forEach(id => document.getElementById(id).value = '');
-  // Reset photo area
-  const area = document.getElementById('photo-upload-area');
-  area.classList.remove('has-image');
-  area.innerHTML = `
-    <input type="file" id="recipe-image-input" accept="image/*" style="display:none">
-    <div class="photo-upload-icon">📷</div>
-    <div class="photo-upload-hint">Tryck för att välja ett foto</div>`;
-  document.getElementById('recipe-image-input').addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    selectedImageFile = file;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      area.innerHTML = `<img src="${ev.target.result}" alt="preview">`;
-      area.classList.add('has-image');
-    };
-    reader.readAsDataURL(file);
-  });
-  document.getElementById('photo-upload-area').addEventListener('click', () => {
-    document.getElementById('recipe-image-input').click();
-  });
+  resetPhotoArea();
   switchPickerTab('emoji');
   initEmojiPicker();
 }
@@ -2373,25 +2360,16 @@ function openEditModal(recipe) {
   selectedImageFile = null;
 
   if (recipe.image_url) {
-    // Switch to photo tab and show current image as preview
     switchPickerTab('photo');
     const area = document.getElementById('photo-upload-area');
     area.innerHTML = `<img src="${recipe.image_url}" alt="preview">`;
     area.classList.add('has-image');
-    // Re-attach click handler so user can replace photo
-    area.addEventListener('click', () => document.getElementById('recipe-image-input').click(), { once: true });
-    document.getElementById('recipe-image-input').addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      selectedImageFile = file;
-      const reader = new FileReader();
-      reader.onload = ev => { area.innerHTML = `<img src="${ev.target.result}" alt="preview">`; area.classList.add('has-image'); };
-      reader.readAsDataURL(file);
-    }, { once: true });
+    document.getElementById('recipe-image-input').value = '';
   } else {
     selectedEmoji = recipe.emoji || '🍽';
     switchPickerTab('emoji');
     initEmojiPicker();
+    resetPhotoArea();
   }
 
   pushModalHistory();
