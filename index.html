@@ -2863,10 +2863,14 @@ const AVATAR_EMOJIS = [
   '🌟','🌈','🎨','🌸','🦋','🍄','🎸','🍕'
 ];
 
-let currentUserAvatar = '👩';
+let currentUserAvatar = localStorage.getItem('mitt-kok-avatar') || '👩';
+
+// Apply cached avatar immediately so there's no flash on reload
+document.querySelector('.avatar-btn').textContent = currentUserAvatar;
 
 function updateAvatarDisplays(emoji) {
   currentUserAvatar = emoji;
+  localStorage.setItem('mitt-kok-avatar', emoji);
   document.querySelector('.avatar-btn').textContent = emoji;
   document.getElementById('account-avatar-display').textContent = emoji;
   document.querySelectorAll('.avatar-option').forEach(btn => {
