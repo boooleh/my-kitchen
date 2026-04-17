@@ -2911,18 +2911,30 @@ async function loadProfile() {
 
 async function loadHouseholdMembers() {
   if (!currentHousehold) return;
-  const { data, error } = await db
+
+  // Step 1: get all members of this household
+  const { data: members, error } = await db
     .from('household_members')
-    .select('user_id, role, profiles(display_name, avatar)')
+    .select('user_id, role')
     .eq('household_id', currentHousehold.id);
-  if (error || !data) return;
+  if (error || !members) return;
+
+  // Step 2: get profiles for those user IDs
+  const userIds = members.map(m => m.user_id);
+  const { data: profilesData } = await db
+    .from('profiles')
+    .select('id, display_name, avatar')
+    .in('id', userIds);
+  const profileMap = {};
+  (profilesData || []).forEach(p => { profileMap[p.id] = p; });
 
   const list = document.getElementById('members-list');
   list.innerHTML = '';
-  data.forEach(member => {
+  members.forEach(member => {
     const isYou = member.user_id === currentUser.id;
-    const avatar = member.profiles?.avatar || '👩';
-    const name = member.profiles?.display_name || (isYou ? 'Du' : 'Medlem');
+    const profile = profileMap[member.user_id];
+    const avatar = profile?.avatar || '👩';
+    const name = profile?.display_name || (isYou ? 'Du' : 'Medlem');
     const roleLabel = member.role === 'owner' ? 'Ägare' : 'Medlem';
     const el = document.createElement('div');
     el.className = 'member-row';
