@@ -2223,6 +2223,57 @@ function updateGroceryItemInDOM(item) {
 document.getElementById('grocery-add-btn').addEventListener('click', addGroceryItem);
 document.getElementById('grocery-input').addEventListener('keydown', e => { if (e.key === 'Enter') addGroceryItem(); });
 
+// ── BARCODE SCANNER: LOOKUP CHAIN ──
+// Given a barcode, try to find a product name by asking, in order:
+//   1. Our shared Supabase product_cache (free, fast, gets smarter over time)
+//   2. Open Food Facts' public API (free, slower, wide coverage)
+// Returns { name, source } on a hit, or null if nothing found anywhere.
+async function lookupProduct(barcode) {
+  // 1. Shared cache first — one tiny DB read.
+  try {
+    const { data, error } = await db
+      .from('product_cache')
+      .select('product_name')
+      .eq('barcode', barcode)
+      .maybeSingle();
+    if (!error && data?.product_name) {
+      return { name: data.product_name, source: 'cache' };
+    }
+  } catch (err) {
+    // Don't bail — a cache error shouldn't stop us from trying OFF.
+    console.warn('product_cache lookup failed:', err);
+  }
+
+  // 2. Fall back to Open Food Facts. We use an AbortController with an 8s
+  //    timeout — OFF is occasionally slow, and we don't want the user
+  //    staring at "Letar upp…" forever.
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(
+      `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const data = await res.json();
+    // OFF returns status:1 for found, status:0 for not-found (with HTTP 200).
+    if (data.status === 1 && data.product) {
+      // Prefer Swedish name if the community has added one, else generic.
+      const name = data.product.product_name_sv
+                || data.product.product_name
+                || null;
+      if (name && name.trim()) {
+        return { name: name.trim(), source: 'openfoodfacts' };
+      }
+    }
+  } catch (err) {
+    console.warn('Open Food Facts lookup failed:', err);
+  }
+
+  return null;
+}
+
 // ── BARCODE SCANNER: OPEN / SCAN / CLOSE ──
 // We keep the active scanner's "controls" here so we can stop the camera
 // cleanly when the user closes the modal. Without this, the phone's camera
@@ -2244,18 +2295,28 @@ async function openScanner() {
 
     // Prefer the back ("environment") camera on phones. On desktop it just
     // falls back to whichever camera is available.
+    //
+    // `handled` guards against the callback firing again between the scan
+    // and closeScanner() actually stopping the stream — ZXing runs its
+    // decoder on every video frame, so duplicates are otherwise possible.
+    let handled = false;
     scannerControls = await reader.decodeFromConstraints(
       { video: { facingMode: 'environment' } },
       video,
-      (result, err) => {
-        if (result) {
+      async (result, err) => {
+        if (result && !handled) {
+          handled = true;
           const barcode = result.getText();
-          // Got a scan — stop the camera immediately so we don't fire again.
           closeScanner();
-          // For now, just show the barcode. Next step will look it up in
-          // product_cache → Open Food Facts → manual input.
-          showToast('Skannad: ' + barcode);
-          console.log('Scanned barcode:', barcode);
+          showToast('Letar upp…');
+          const product = await lookupProduct(barcode);
+          if (product) {
+            showToast(`Hittade: ${product.name}`);
+            console.log('Found', product, 'for barcode', barcode);
+          } else {
+            showToast('Kunde inte hitta produkten');
+            console.log('No match for barcode', barcode);
+          }
         }
         // ZXing calls back continuously; `err` is fired for every frame that
         // didn't decode. That's normal, so we only log real failures.
