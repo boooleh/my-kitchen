@@ -1927,7 +1927,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.1.7';
+const APP_VERSION = '2.1.8';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2586,6 +2586,14 @@ let scannerControls = null;
 let liveStatusTimer = null;
 let scanStartTime = 0;
 let statusPhase = 0;
+// Debounce timer for leaving the phase-3 "nästan där" state. Each new
+// partial-match err from ZXing clears and resets this timer, so we stay
+// in phase 3 as long as partial matches keep arriving. It only fires
+// (and reverts us to phase 0) after ~1.5s of silence — i.e. when the
+// user has moved the phone away from the barcode. Without this debounce
+// the status ping-pongs between "nästan där" and the base hint every
+// 1.5s, which feels broken.
+let nearMatchRevertTimer = null;
 
 async function openScanner() {
   const overlay = document.getElementById('scanner-overlay');
@@ -2648,6 +2656,12 @@ async function openScanner() {
             // Scanner stays open — reset the live-status timer so the next
             // scan starts fresh with phase 0 copy, not "Försök med bättre
             // ljus" that might be leftover from the previous attempt.
+            // Also kill any pending "nästan där" revert timer so it can't
+            // fire later and overwrite the fresh status.
+            if (nearMatchRevertTimer) {
+              clearTimeout(nearMatchRevertTimer);
+              nearMatchRevertTimer = null;
+            }
             scanStartTime = Date.now();
             statusPhase = 0;
             setStatus('Rikta kameran mot streckkoden', true);
@@ -2668,8 +2682,7 @@ async function openScanner() {
         } else if (
           err &&
           err.constructor?.name &&
-          err.constructor.name !== 'NotFoundException' &&
-          statusPhase !== 3
+          err.constructor.name !== 'NotFoundException'
         ) {
           // ZXing fires `err` every frame that didn't decode — almost
           // always NotFoundException (no barcode found at all). But when
@@ -2677,11 +2690,21 @@ async function openScanner() {
           // library DID see a barcode-shaped pattern and tried to decode
           // it — it's just blurry, partial, or corrupted. That's a much
           // stronger "you're close" signal than the timing hints below.
-          setStatus('Håll still – nästan där...', true);
-          statusPhase = 3;
-          // Fall back to the general timing hints after 1.5s if no
-          // successful read follows.
-          setTimeout(() => {
+          //
+          // We only bump the DOM when we aren't already in phase 3, so the
+          // status text doesn't churn on every frame.
+          if (statusPhase !== 3) {
+            setStatus('Håll still – nästan där...', true);
+            statusPhase = 3;
+          }
+          // Debounce the revert: cancel any pending fallback and restart
+          // the 1.5s timer. While partial matches keep arriving we stay
+          // in phase 3. Only when partials stop coming (user moved the
+          // phone away) does this finally fire — exactly once — and
+          // bring the status back to the base hint.
+          if (nearMatchRevertTimer) clearTimeout(nearMatchRevertTimer);
+          nearMatchRevertTimer = setTimeout(() => {
+            nearMatchRevertTimer = null;
             if (scannerControls && statusPhase === 3) {
               statusPhase = 0;
               scanStartTime = Date.now();
@@ -2735,6 +2758,12 @@ function closeScanner() {
   if (liveStatusTimer) {
     clearInterval(liveStatusTimer);
     liveStatusTimer = null;
+  }
+  // Same for the "nästan där" revert debounce — otherwise it could fire
+  // after the overlay is already hidden and leave stale state behind.
+  if (nearMatchRevertTimer) {
+    clearTimeout(nearMatchRevertTimer);
+    nearMatchRevertTimer = null;
   }
   statusPhase = 0;
   document.getElementById('scanner-overlay').classList.remove('open');
