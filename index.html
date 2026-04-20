@@ -1927,7 +1927,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.1.8';
+const APP_VERSION = '2.1.9';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2620,7 +2620,34 @@ async function openScanner() {
     // Phase 2 (camera handshake) — the library is parsed, now we're
     // waiting on getUserMedia + the first video frame.
     setStatus('Öppnar kameran…');
-    const reader = new zxing.BrowserMultiFormatReader();
+
+    // Restrict decoding to the barcode formats used on grocery products.
+    // By default ZXing tries ~15 formats (QR, Data Matrix, Code 128, etc.)
+    // per video frame, which is wasted work for us — we only ever scan
+    // retail barcodes. Hinting POSSIBLE_FORMATS cuts the per-frame CPU
+    // cost noticeably and gives the decoder more headroom to try harder
+    // on the formats we DO care about.
+    //   EAN-13 — European retail standard (95%+ of Swedish groceries)
+    //   EAN-8  — small packages (gum, candy, single-serve)
+    //   UPC-A  — American retail, also accepted on imported products
+    //   UPC-E  — compressed UPC, small packages in US
+    //
+    // Defensive: if the CDN ever changes what it exports, fall back to
+    // the unhinted default reader rather than breaking scanning entirely.
+    let reader;
+    if (zxing.DecodeHintType && zxing.BarcodeFormat) {
+      const hints = new Map();
+      hints.set(zxing.DecodeHintType.POSSIBLE_FORMATS, [
+        zxing.BarcodeFormat.EAN_13,
+        zxing.BarcodeFormat.EAN_8,
+        zxing.BarcodeFormat.UPC_A,
+        zxing.BarcodeFormat.UPC_E,
+      ]);
+      reader = new zxing.BrowserMultiFormatReader(hints);
+    } else {
+      console.warn('ZXing hints unavailable, using default multi-format reader');
+      reader = new zxing.BrowserMultiFormatReader();
+    }
 
     // Prefer the back ("environment") camera on phones. On desktop it just
     // falls back to whichever camera is available.
