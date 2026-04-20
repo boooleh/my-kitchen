@@ -321,6 +321,15 @@
   }
   .update-banner-btn:hover { transform: scale(1.05); background: #e85a24; }
 
+  /* ── CONFIRM PRODUCT MODAL ── */
+  .confirm-product-meta {
+    font-size: 0.75rem;
+    color: var(--gray-3);
+    margin-bottom: 18px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    line-height: 1.4;
+  }
+
   .grocery-list { padding: 0 24px; display: flex; flex-direction: column; gap: 4px; }
   .grocery-list.no-animate .grocery-item { animation: none; }
 
@@ -1600,6 +1609,25 @@
   <button class="update-banner-btn" id="update-reload" type="button">Ladda om</button>
 </div>
 
+<!-- CONFIRM PRODUCT MODAL (after a barcode scan) -->
+<div class="modal-overlay" id="confirm-product-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Lägg till i listan</div>
+    <label class="modal-label">Produktnamn</label>
+    <input
+      class="modal-input"
+      id="confirm-product-name"
+      type="text"
+      placeholder="t.ex. Mjölk 3%"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="sentences" />
+    <div class="confirm-product-meta" id="confirm-product-meta"></div>
+    <button class="modal-save-btn" id="confirm-product-save" type="button">Lägg till</button>
+  </div>
+</div>
+
 <!-- ADD RECIPE MODAL -->
 <div class="modal-overlay" id="add-modal">
   <div class="modal">
@@ -2310,13 +2338,7 @@ async function openScanner() {
           closeScanner();
           showToast('Letar upp…');
           const product = await lookupProduct(barcode);
-          if (product) {
-            showToast(`Hittade: ${product.name}`);
-            console.log('Found', product, 'for barcode', barcode);
-          } else {
-            showToast('Kunde inte hitta produkten');
-            console.log('No match for barcode', barcode);
-          }
+          openConfirmModal(barcode, product?.name || '', product?.source || null);
         }
         // ZXing calls back continuously; `err` is fired for every frame that
         // didn't decode. That's normal, so we only log real failures.
@@ -2343,6 +2365,93 @@ function closeScanner() {
 
 document.getElementById('grocery-scan-btn').addEventListener('click', openScanner);
 document.getElementById('scanner-close').addEventListener('click', closeScanner);
+
+// ── CONFIRM PRODUCT MODAL ──
+// Opens after a successful scan so the user can confirm or edit the product
+// name before it's added to the grocery list. Stores which barcode is being
+// confirmed so the save handler can write it to product_cache.
+let pendingBarcode = null;
+
+function openConfirmModal(barcode, prefilledName, source) {
+  pendingBarcode = barcode;
+  const input = document.getElementById('confirm-product-name');
+  input.value = prefilledName || '';
+
+  // Little meta line under the input: shows the barcode for context and
+  // where the prefill came from. Helps you trust what you're seeing.
+  const sourceLabel = {
+    cache: 'Från cachen',
+    openfoodfacts: 'Från Open Food Facts',
+  }[source] || 'Inget namn hittat — skriv själv';
+  document.getElementById('confirm-product-meta').textContent =
+    `Streckkod: ${barcode} · ${sourceLabel}`;
+
+  document.getElementById('confirm-product-modal').classList.add('open');
+
+  // Focus the input after the slide-up animation finishes. Select-all if
+  // there's a prefill so the user can immediately type-over without tapping.
+  setTimeout(() => {
+    input.focus();
+    if (prefilledName) input.select();
+  }, 350);
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirm-product-modal').classList.remove('open');
+  pendingBarcode = null;
+}
+
+async function saveConfirmedProduct() {
+  const name = document.getElementById('confirm-product-name').value.trim();
+  if (!name || !pendingBarcode) return;
+  const barcode = pendingBarcode;
+
+  closeConfirmModal();
+
+  // --- Add to the grocery list (same pattern as addGroceryItem) ---
+  if (!currentGroceryListId) {
+    currentGroceryListId = await getOrCreateGroceryList();
+  }
+  if (!currentGroceryListId) {
+    showToast('Kunde inte hitta inköpslistan 😕');
+    return;
+  }
+
+  const { error: addError } = await db.from('grocery_items').insert({
+    grocery_list_id: currentGroceryListId,
+    name,
+    checked: false,
+    category: categorize(name),
+  });
+  if (addError) {
+    console.error('Grocery add failed:', addError.message);
+    showToast('Kunde inte lägga till vara 😕');
+    return;
+  }
+
+  showToast(`Tillagd: ${name}`);
+
+  // --- Write to product_cache (first writer wins, skip duplicates) ---
+  // Postgres error code 23505 = unique constraint violation = barcode
+  // already cached. That's not an error for us — it just means someone
+  // scanned this product before. Every other error we want to know about.
+  const { error: cacheError } = await db.from('product_cache').insert({
+    barcode,
+    product_name: name,
+  });
+  if (cacheError && cacheError.code !== '23505') {
+    console.warn('Cache write failed:', cacheError.message);
+  }
+}
+
+document.getElementById('confirm-product-save').addEventListener('click', saveConfirmedProduct);
+document.getElementById('confirm-product-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveConfirmedProduct();
+});
+// Tap outside the modal body to close (matches existing modal behaviour)
+document.getElementById('confirm-product-modal').addEventListener('click', e => {
+  if (e.target.id === 'confirm-product-modal') closeConfirmModal();
+});
 
 async function addGroceryItem() {
   const input = document.getElementById('grocery-input');
@@ -3353,6 +3462,7 @@ window.addEventListener('popstate', () => {
     { id: 'cooking-modal',       close: closeCookingMode },
     { id: 'detail-menu-overlay', close: closeDetailMenu },
     { id: 'ingredient-modal',    close: () => document.getElementById('ingredient-modal').classList.remove('open') },
+    { id: 'confirm-product-modal', close: closeConfirmModal },
     { id: 'add-modal',           close: () => { document.getElementById('add-modal').classList.remove('open'); resetAddModal(); } },
     { id: 'detail-modal',        close: () => document.getElementById('detail-modal').classList.remove('open') },
     { id: 'account-panel',       close: () => document.getElementById('account-panel').classList.remove('open') },
