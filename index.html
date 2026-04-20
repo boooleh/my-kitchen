@@ -358,14 +358,30 @@
   .grocery-list.no-animate .grocery-item { animation: none; }
 
   .grocery-item {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 13px 14px;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background 0.15s;
+    /* touch-action: pan-y lets the browser handle vertical scroll while
+       leaving horizontal drags for our swipe-to-delete handler. */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background 0.15s, transform 0.2s var(--ease-spring);
     animation: slideIn 0.3s var(--ease-spring);
+  }
+  .grocery-item.swiping {
+    /* While the finger is down we want the row to follow instantly,
+       so we turn the transform transition off during the drag. */
+    transition: none;
+  }
+  .grocery-item.deleting {
+    transform: translateX(-100%) !important;
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease;
   }
   @keyframes slideIn {
     from { opacity: 0; transform: translateX(-12px); }
@@ -396,15 +412,35 @@
     transition: text-decoration 0.2s;
   }
   .grocery-item.checked .grocery-item-name { text-decoration: line-through; color: var(--gray-3); }
-  .grocery-item-del {
+  /* Edit pill — absolutely-positioned so it doesn't alter row layout.
+     Hidden until .edit-revealed is added (by a long-press). */
+  .grocery-item-edit {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%) translateX(8px);
     opacity: 0;
-    font-size: 1rem;
-    color: var(--gray-3);
-    transition: opacity 0.15s;
+    pointer-events: none;
+    padding: 6px 14px;
+    background: var(--orange);
+    color: white;
+    border: none;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    font-family: inherit;
     cursor: pointer;
-    padding: 2px 4px;
+    white-space: nowrap;
+    transition: opacity 0.15s ease, transform 0.2s var(--ease-spring);
   }
-  .grocery-item:hover .grocery-item-del { opacity: 1; }
+  .grocery-item.edit-revealed {
+    background: var(--gray-1);
+  }
+  .grocery-item.edit-revealed .grocery-item-edit {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(-50%) translateX(0);
+  }
 
   .grocery-category-header {
     padding: 14px 24px 6px;
@@ -1643,11 +1679,11 @@
   <button class="update-banner-btn" id="update-reload" type="button">Ladda om</button>
 </div>
 
-<!-- CONFIRM PRODUCT MODAL (after a barcode scan) -->
+<!-- CONFIRM / EDIT PRODUCT MODAL (reused for both "after scan" and "edit row") -->
 <div class="modal-overlay" id="confirm-product-modal">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Lägg till i listan</div>
+    <div class="modal-title" id="confirm-product-title">Lägg till i listan</div>
     <label class="modal-label">Produktnamn</label>
     <input
       class="modal-input"
@@ -2155,23 +2191,164 @@ function createGroceryElement(item) {
   el.innerHTML = `
     <div class="check-circle">${item.checked ? '✓' : ''}</div>
     <div class="grocery-item-name">${item.name}</div>
-    <span class="grocery-item-del" data-id="${item.id}">✕</span>
+    <button class="grocery-item-edit" type="button">Ändra</button>
   `;
-  el.addEventListener('click', async (e) => {
-    const current = groceryItems.find(i => i.id === item.id);
-    if (!current) return;
-    if (e.target.classList.contains('grocery-item-del')) {
-      groceryItems = groceryItems.filter(i => i.id !== current.id);
-      el.remove();
-      cleanupEmptyCategories();
-      updateGroceryMeta();
-      await db.from('grocery_items').delete().eq('id', current.id);
-    } else {
-      await db.from('grocery_items').update({ checked: !current.checked }).eq('id', current.id);
-    }
-  });
+  attachGroceryRowGestures(el, item);
   return el;
 }
+
+// ── ROW GESTURES ──
+// Two gestures live on every grocery row:
+//   • Long-press (500ms, no movement) → reveal the "Ändra" pill so you can edit
+//   • Swipe left past a threshold → delete the row (with a snap-back if you
+//     don't swipe far enough — iOS-style commit-on-release)
+// A normal tap still toggles checked; tapping while a pill is revealed just
+// dismisses the reveal. We use pointer events so the same code works on
+// touch, mouse, and pen.
+function attachGroceryRowGestures(el, item) {
+  let startX = null, startY = null;
+  let currentDx = 0;
+  let isSwipe = false;
+  let longPressTimer = null;
+  let longPressFired = false;
+
+  const LONG_PRESS_MS = 500;
+  const SWIPE_CLAIM_PX = 10;    // start treating the drag as a swipe after this
+  const DELETE_THRESHOLD = 80;  // swipe past this to commit the delete on release
+
+  el.addEventListener('pointerdown', (e) => {
+    if (el.classList.contains('deleting')) return;
+    startX = e.clientX;
+    startY = e.clientY;
+    currentDx = 0;
+    isSwipe = false;
+    longPressFired = false;
+
+    // Long-press timer — fires only if the user stays still.
+    longPressTimer = setTimeout(() => {
+      if (!isSwipe) {
+        // Only one row can be revealed at a time.
+        document.querySelectorAll('.grocery-item.edit-revealed')
+          .forEach(r => r.classList.remove('edit-revealed'));
+        el.classList.add('edit-revealed');
+        longPressFired = true;
+      }
+      longPressTimer = null;
+    }, LONG_PRESS_MS);
+
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    if (startX === null) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    // Any real movement means this isn't a long-press.
+    if (longPressTimer && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+
+    // Claim the horizontal swipe gesture if the user is pulling left
+    // and the motion is more horizontal than vertical.
+    if (!isSwipe && dx < -SWIPE_CLAIM_PX && Math.abs(dx) > Math.abs(dy)) {
+      isSwipe = true;
+      el.classList.add('swiping');
+    }
+    if (isSwipe) {
+      currentDx = Math.min(0, dx); // left-only — no rubber-band to the right
+      el.style.transform = `translateX(${currentDx}px)`;
+    }
+  });
+
+  el.addEventListener('pointerup', async () => {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+
+    if (isSwipe) {
+      el.classList.remove('swiping');
+      if (currentDx < -DELETE_THRESHOLD) {
+        // Commit delete — CSS animates off-screen, then we drop the DOM
+        // node and the DB row. Optimistic: DB call runs in parallel.
+        el.classList.add('deleting');
+        el.style.transform = '';
+        groceryItems = groceryItems.filter(i => i.id !== item.id);
+        db.from('grocery_items').delete().eq('id', item.id)
+          .then(({ error }) => { if (error) console.error('Delete failed:', error.message); });
+        setTimeout(() => {
+          el.remove();
+          cleanupEmptyCategories();
+          updateGroceryMeta();
+        }, 260);
+      } else {
+        // Short of the threshold — snap back home.
+        el.style.transform = '';
+      }
+    }
+
+    startX = startY = null;
+    currentDx = 0;
+    isSwipe = false;
+    // NOTE: longPressFired intentionally NOT cleared here — the click
+    // handler below still needs to see it to suppress the synthetic tap.
+  });
+
+  el.addEventListener('pointercancel', () => {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    el.classList.remove('swiping');
+    el.style.transform = '';
+    startX = startY = null;
+    currentDx = 0;
+    isSwipe = false;
+  });
+
+  el.addEventListener('click', async (e) => {
+    // Tap on the "Ändra" pill → open the edit modal.
+    if (e.target.classList.contains('grocery-item-edit')) {
+      e.stopPropagation();
+      el.classList.remove('edit-revealed');
+      longPressFired = false;
+      const current = groceryItems.find(i => i.id === item.id);
+      if (current) openGroceryEditModal(current);
+      return;
+    }
+
+    // The synthetic click that fires right after a long-press would
+    // otherwise immediately dismiss the reveal. Swallow it here so the
+    // user can actually see and tap the "Ändra" pill.
+    if (longPressFired) {
+      longPressFired = false;
+      e.stopPropagation(); // keep the global dismiss handler quiet too
+      return;
+    }
+
+    // If a row (this one or another) is currently revealed, a tap
+    // dismisses it without toggling — we don't want an accidental
+    // check-toggle while the user is mid-choice.
+    const anyRevealed = document.querySelector('.grocery-item.edit-revealed');
+    if (anyRevealed) {
+      anyRevealed.classList.remove('edit-revealed');
+      return;
+    }
+
+    // Normal tap → toggle checked.
+    const current = groceryItems.find(i => i.id === item.id);
+    if (!current) return;
+    await db.from('grocery_items').update({ checked: !current.checked }).eq('id', item.id);
+  });
+}
+
+// Tap anywhere outside a revealed row dismisses the "Ändra" pill.
+// Row-level handlers handle inside-list dismissal; this catches taps
+// on page whitespace, headers, etc. Runs only when there's a row to
+// dismiss so it's a cheap no-op the rest of the time.
+document.addEventListener('click', (e) => {
+  const revealed = document.querySelector('.grocery-item.edit-revealed');
+  if (!revealed) return;
+  if (!revealed.contains(e.target)) {
+    revealed.classList.remove('edit-revealed');
+  }
+});
 
 function updateGroceryMeta() {
   const hasChecked = groceryItems.some(i => i.checked);
@@ -2258,6 +2435,11 @@ function updateGroceryItemInDOM(item) {
   const el = list.querySelector(`.grocery-item[data-id="${item.id}"]`);
   if (!el) { renderGrocery(true); return; }
 
+  // Keep the visible name in sync with the row — edits from this device
+  // or another will flow through here via the realtime UPDATE handler.
+  const nameEl = el.querySelector('.grocery-item-name');
+  if (nameEl) nameEl.textContent = item.name;
+
   el.classList.toggle('checked', item.checked);
   el.querySelector('.check-circle').textContent = item.checked ? '✓' : '';
 
@@ -2283,6 +2465,8 @@ function updateGroceryItemInDOM(item) {
       if (firstChecked) { list.insertBefore(header, firstChecked); list.insertBefore(el, firstChecked); }
       else { list.appendChild(header); list.appendChild(el); }
     }
+    // If the category changed, the old section may now be empty.
+    cleanupEmptyCategories();
   }
   updateGroceryMeta();
 }
@@ -2373,6 +2557,10 @@ async function openScanner() {
     // `handled` guards against the callback firing again between the scan
     // and closeScanner() actually stopping the stream — ZXing runs its
     // decoder on every video frame, so duplicates are otherwise possible.
+    // `handled` prevents the callback from firing again for the same scan
+    // while we're mid-lookup. In fast-path mode we release it on a delay
+    // so the same barcode can't re-trigger in rapid succession, but a
+    // different barcode immediately can.
     let handled = false;
     scannerControls = await reader.decodeFromConstraints(
       { video: { facingMode: 'environment' } },
@@ -2381,15 +2569,33 @@ async function openScanner() {
         if (result && !handled) {
           handled = true;
           const barcode = result.getText();
-          closeScanner();
-          showToast('Letar upp…');
           const product = await lookupProduct(barcode);
-          openConfirmModal(
-            barcode,
-            product?.name || '',
-            product?.source || null,
-            product?.category || null,
-          );
+
+          if (product?.name && product?.category) {
+            // FAST PATH — we already know what this product is. Add it
+            // directly to the list, show a toast, and keep scanning.
+            // No modal, no taps required. This is the payoff for having
+            // confirmed the product at least once before.
+            await addScannedItemToList({
+              barcode,
+              name: product.name,
+              category: product.category,
+              upsertCache: false, // data's already in cache, no need to rewrite
+            });
+            // Short lockout so the same barcode doesn't re-fire from the
+            // next video frame; a different barcode can still trigger.
+            setTimeout(() => { handled = false; }, 1500);
+          } else {
+            // SLOW PATH — new product, or cache entry without category.
+            // Close the camera and ask the user to confirm.
+            closeScanner();
+            openConfirmModal(
+              barcode,
+              product?.name || '',
+              product?.source || null,
+              product?.category || null,
+            );
+          }
         }
         // ZXing calls back continuously; `err` is fired for every frame that
         // didn't decode. That's normal, so we only log real failures.
@@ -2423,7 +2629,13 @@ document.getElementById('scanner-close').addEventListener('click', closeScanner)
 // confirmed so the save handler can write it to product_cache.
 let pendingBarcode = null;
 
-// Which category will be used when we hit "Lägg till". Starts as the
+// When the modal is reused for editing a grocery row, we remember which
+// row is being edited (and its barcode, if any) so Save can UPDATE that
+// row and — when a barcode is present — also update the shared cache.
+let editingItemId = null;
+let editingItemBarcode = null;
+
+// Which category will be used when we hit Save. Starts as the
 // auto-detected guess and follows the user's name edits until they
 // manually pick a chip — after that, their choice wins.
 let selectedCategory = 'other';
@@ -2452,6 +2664,14 @@ function renderCategoryPicker() {
 
 function openConfirmModal(barcode, prefilledName, source, cachedCategory) {
   pendingBarcode = barcode;
+  // Make sure we're not stuck in edit mode from a previous open.
+  editingItemId = null;
+  editingItemBarcode = null;
+
+  // Title/button copy for scan-add mode.
+  document.getElementById('confirm-product-title').textContent = 'Lägg till i listan';
+  document.getElementById('confirm-product-save').textContent = 'Lägg till';
+
   const input = document.getElementById('confirm-product-name');
   input.value = prefilledName || '';
 
@@ -2488,60 +2708,162 @@ function openConfirmModal(barcode, prefilledName, source, cachedCategory) {
   }, 350);
 }
 
+// Open the same modal in EDIT mode — prefilled from an existing grocery row.
+// Save will UPDATE that row (and the shared cache, if the row has a barcode).
+// Name-spaced as "Grocery" because a separate openEditModal already exists
+// for editing recipes — don't clobber it.
+function openGroceryEditModal(item) {
+  editingItemId = item.id;
+  editingItemBarcode = item.barcode || null;
+  pendingBarcode = null; // not from a scan
+
+  // Swap the copy so it's clear this is an edit, not an add.
+  document.getElementById('confirm-product-title').textContent = 'Ändra vara';
+  document.getElementById('confirm-product-save').textContent = 'Spara';
+
+  const input = document.getElementById('confirm-product-name');
+  input.value = item.name || '';
+
+  // Lock the category to whatever was stored on the row. Typing won't
+  // drift it; the user can tap a chip to change it explicitly.
+  if (item.category) {
+    selectedCategory = item.category;
+    userPickedCategory = true;
+  } else {
+    userPickedCategory = false;
+    selectedCategory = categorize(item.name || '') || 'other';
+  }
+  renderCategoryPicker();
+
+  // Meta line: show barcode if we have one, otherwise a gentle nudge.
+  document.getElementById('confirm-product-meta').textContent =
+    item.barcode ? `Streckkod: ${item.barcode}` : 'Ändringar sparas direkt';
+
+  document.getElementById('confirm-product-modal').classList.add('open');
+
+  setTimeout(() => {
+    input.focus();
+    input.select();
+  }, 350);
+}
+
 function closeConfirmModal() {
   document.getElementById('confirm-product-modal').classList.remove('open');
   pendingBarcode = null;
+  editingItemId = null;
+  editingItemBarcode = null;
 }
 
-async function saveConfirmedProduct() {
-  const name = document.getElementById('confirm-product-name').value.trim();
-  if (!name || !pendingBarcode) return;
-  // Snapshot these before closeConfirmModal() resets pendingBarcode to null.
-  const barcode = pendingBarcode;
-  const category = selectedCategory;
-
-  closeConfirmModal();
-
-  // --- Add to the grocery list (same pattern as addGroceryItem) ---
+// ── SHARED: ADD A SCANNED ITEM TO THE GROCERY LIST ──
+// One helper used by both the fast-path (cache hit with category) and the
+// slow-path confirm modal. Centralizing means the toast copy, error
+// handling, and cache-upsert policy stay consistent in one place.
+async function addScannedItemToList({ barcode, name, category, upsertCache }) {
   if (!currentGroceryListId) {
     currentGroceryListId = await getOrCreateGroceryList();
   }
   if (!currentGroceryListId) {
     showToast('Kunde inte hitta inköpslistan 😕');
-    return;
+    return false;
   }
 
+  // We write `barcode` onto the grocery row so that editing the item
+  // later can update the corresponding product_cache entry. Manually-typed
+  // items will always have a null barcode — that's expected.
   const { error: addError } = await db.from('grocery_items').insert({
     grocery_list_id: currentGroceryListId,
     name,
     checked: false,
     category,
+    barcode,
   });
   if (addError) {
     console.error('Grocery add failed:', addError.message);
     showToast('Kunde inte lägga till vara 😕');
+    return false;
+  }
+
+  showToast(`✓ Tillagd: ${name}`);
+
+  if (upsertCache) {
+    // Upsert (not plain insert) so that a category change on a later scan
+    // overwrites the stored one. onConflict: 'barcode' relies on the UNIQUE
+    // constraint on the barcode column in product_cache.
+    const { error: cacheError } = await db
+      .from('product_cache')
+      .upsert({ barcode, product_name: name, category }, { onConflict: 'barcode' });
+    if (cacheError) {
+      console.warn('Cache write failed:', cacheError.message);
+    }
+  }
+
+  return true;
+}
+
+// ── SAVE HANDLER FOR THE CONFIRM/EDIT MODAL ──
+// The same modal serves two jobs:
+//   1. Confirming a freshly-scanned product (editingItemId === null)
+//   2. Editing an existing grocery row (editingItemId = row id)
+// We branch on editingItemId so the save button does the right DB call
+// and the right follow-up UX (reopen scanner vs. do nothing).
+async function saveConfirmedProduct() {
+  const name = document.getElementById('confirm-product-name').value.trim();
+  if (!name) return;
+  const category = selectedCategory;
+
+  if (editingItemId) {
+    // ── EDIT MODE ──
+    const itemId = editingItemId;
+    const barcode = editingItemBarcode;
+    editingItemId = null;
+    editingItemBarcode = null;
+
+    closeConfirmModal();
+
+    const { error: updateError } = await db
+      .from('grocery_items')
+      .update({ name, category })
+      .eq('id', itemId);
+    if (updateError) {
+      console.error('Update failed:', updateError.message);
+      showToast('Kunde inte ändra vara 😕');
+      return;
+    }
+
+    // Update local state + re-render so the item moves section if the
+    // category changed (e.g. Frukt & Grönt → Drycker).
+    const idx = groceryItems.findIndex(i => i.id === itemId);
+    if (idx !== -1) {
+      groceryItems[idx] = { ...groceryItems[idx], name, category };
+    }
+    renderGrocery(true);
+
+    showToast('✓ Ändrad');
+
+    // Propagate the correction back to the shared cache so the next
+    // person who scans this barcode gets the corrected name + category.
+    if (barcode) {
+      const { error: cacheError } = await db
+        .from('product_cache')
+        .upsert({ barcode, product_name: name, category }, { onConflict: 'barcode' });
+      if (cacheError) {
+        console.warn('Cache update failed:', cacheError.message);
+      }
+    }
     return;
   }
 
-  // Clear confirmation so it's obvious the save landed, even when the
-  // scanner reopens on top.
-  showToast(`✓ Tillagd: ${name}`);
+  // ── CREATE MODE (from a scan) ──
+  if (!pendingBarcode) return;
+  // Snapshot before closeConfirmModal() resets pendingBarcode.
+  const barcode = pendingBarcode;
 
-  // --- Upsert into product_cache so the category choice sticks ---
-  // We upsert (instead of plain insert) so that re-picking a different
-  // category on a future scan updates the stored one. `onConflict: 'barcode'`
-  // relies on the UNIQUE constraint on the barcode column.
-  const { error: cacheError } = await db
-    .from('product_cache')
-    .upsert({ barcode, product_name: name, category }, { onConflict: 'barcode' });
-  if (cacheError) {
-    console.warn('Cache write failed:', cacheError.message);
-  }
+  closeConfirmModal();
 
-  // --- Stay on the scan screen so the user can keep scanning ---
-  // openScanner() restarts the camera stream fresh. Tiny flicker is fine;
-  // it's the simplest way to guarantee a clean ZXing decoder state for
-  // the next code (avoids stale `handled` flags from the previous run).
+  const ok = await addScannedItemToList({ barcode, name, category, upsertCache: true });
+  if (!ok) return;
+
+  // Keep the user on the scan screen so they can scan the next item.
   openScanner();
 }
 
