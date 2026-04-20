@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mitt Kök</title>
 
+<!-- Tell the browser to re-check with the server before using a cached copy.
+     Helps new versions of the app reach users faster, without breaking offline mode. -->
+<meta http-equiv="Cache-Control" content="no-cache">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
 <!-- PWA: Install as app on home screen -->
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="mitt-kok.png">
@@ -269,6 +275,51 @@
     z-index: 3;
     text-shadow: 0 1px 6px rgba(0,0,0,0.6);
   }
+
+  /* ── NEW VERSION BANNER ── */
+  .update-banner {
+    position: fixed;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    left: 16px; right: 16px;
+    max-width: 430px;
+    margin: 0 auto;
+    background: var(--orange-light);
+    border-radius: var(--radius-md);
+    padding: 12px 14px 12px 18px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    z-index: 300;
+    box-shadow: 0 8px 24px rgba(255,107,53,0.15), 0 2px 8px rgba(0,0,0,0.08);
+    animation: slideUpBanner 0.4s var(--ease-spring);
+  }
+  .update-banner.open { display: flex; }
+  @keyframes slideUpBanner {
+    from { transform: translateY(140%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .update-banner-text {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--orange);
+    line-height: 1.2;
+  }
+  .update-banner-btn {
+    background: var(--orange);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.2s var(--ease-spring), background 0.15s;
+  }
+  .update-banner-btn:hover { transform: scale(1.05); background: #e85a24; }
 
   .grocery-list { padding: 0 24px; display: flex; flex-direction: column; gap: 4px; }
   .grocery-list.no-animate .grocery-item { animation: none; }
@@ -1543,6 +1594,12 @@
   <div class="scanner-status" id="scanner-status">Öppnar kameran…</div>
 </div>
 
+<!-- NEW VERSION BANNER -->
+<div class="update-banner" id="update-banner">
+  <span class="update-banner-text">Ny version tillgänglig</span>
+  <button class="update-banner-btn" id="update-reload" type="button">Ladda om</button>
+</div>
+
 <!-- ADD RECIPE MODAL -->
 <div class="modal-overlay" id="add-modal">
   <div class="modal">
@@ -1732,6 +1789,36 @@ function loadZxing() {
 
   return zxingPromise;
 }
+
+// ── AUTO-UPDATE: CHECK FOR NEW VERSION ──
+// On every deploy, bump APP_VERSION here AND the "version" field in
+// version.json. When the two don't match, show the banner so users
+// can reload into the new code. Skip-fails silently when offline.
+const APP_VERSION = '2.1.0';
+
+async function checkForUpdate() {
+  try {
+    // The ?t= query string is a cache-buster — it makes every request
+    // unique so we never get a stale version.json from a CDN or proxy.
+    // { cache: 'no-store' } is a second belt: tell fetch not to cache either.
+    const res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.version && data.version !== APP_VERSION) {
+      document.getElementById('update-banner').classList.add('open');
+    }
+  } catch (err) {
+    // Probably offline — no harm done, we'll try again on the next interval.
+  }
+}
+
+// Check once on app startup. If there's a newer version waiting,
+// the banner slides up within a second of opening the app.
+checkForUpdate();
+
+document.getElementById('update-reload').addEventListener('click', () => {
+  location.reload();
+});
 
 // ── SUPABASE GROCERY SYNC ──
 let groceryChannel = null;
