@@ -1927,7 +1927,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.1.5';
+const APP_VERSION = '2.1.6';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2833,6 +2833,14 @@ async function addScannedItemToList({ barcode, name, category, upsertCache }) {
   }
 
   showToast(`✓ Tillagd: ${name}`);
+
+  // Tactile confirmation — a tiny buzz so the user feels that the scan
+  // registered, in addition to the visual toast. Works on Android/Chrome;
+  // iOS Safari silently ignores navigator.vibrate, so this is purely
+  // additive — no harm on iPhones, just no extra feedback there.
+  if (typeof navigator.vibrate === 'function') {
+    navigator.vibrate(40);
+  }
 
   if (upsertCache) {
     // Upsert (not plain insert) so that a category change on a later scan
