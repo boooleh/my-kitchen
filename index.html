@@ -2297,14 +2297,21 @@ document.getElementById('grocery-input').addEventListener('keydown', e => { if (
 // Returns { name, source } on a hit, or null if nothing found anywhere.
 async function lookupProduct(barcode) {
   // 1. Shared cache first — one tiny DB read.
+  //    We also read `category` so a re-scan can pre-pick the chip the user
+  //    chose last time. Old rows may have category = null; that's fine,
+  //    we just fall back to the auto-guess in that case.
   try {
     const { data, error } = await db
       .from('product_cache')
-      .select('product_name')
+      .select('product_name, category')
       .eq('barcode', barcode)
       .maybeSingle();
     if (!error && data?.product_name) {
-      return { name: data.product_name, source: 'cache' };
+      return {
+        name: data.product_name,
+        source: 'cache',
+        category: data.category || null,
+      };
     }
   } catch (err) {
     // Don't bail — a cache error shouldn't stop us from trying OFF.
@@ -2377,7 +2384,12 @@ async function openScanner() {
           closeScanner();
           showToast('Letar upp…');
           const product = await lookupProduct(barcode);
-          openConfirmModal(barcode, product?.name || '', product?.source || null);
+          openConfirmModal(
+            barcode,
+            product?.name || '',
+            product?.source || null,
+            product?.category || null,
+          );
         }
         // ZXing calls back continuously; `err` is fired for every frame that
         // didn't decode. That's normal, so we only log real failures.
@@ -2438,15 +2450,23 @@ function renderCategoryPicker() {
   });
 }
 
-function openConfirmModal(barcode, prefilledName, source) {
+function openConfirmModal(barcode, prefilledName, source, cachedCategory) {
   pendingBarcode = barcode;
   const input = document.getElementById('confirm-product-name');
   input.value = prefilledName || '';
 
   // Fresh state each time the modal opens — otherwise a previous manual
   // choice would stick around into the next scan.
-  userPickedCategory = false;
-  selectedCategory = prefilledName ? categorize(prefilledName) : 'other';
+  if (cachedCategory) {
+    // Someone (maybe us) already picked a category for this barcode —
+    // trust it and lock it in so live typing doesn't override the
+    // human-confirmed choice. User can still tap a chip to change.
+    selectedCategory = cachedCategory;
+    userPickedCategory = true;
+  } else {
+    userPickedCategory = false;
+    selectedCategory = prefilledName ? categorize(prefilledName) : 'other';
+  }
   renderCategoryPicker();
 
   // Little meta line under the input: shows the barcode for context and
@@ -2476,7 +2496,9 @@ function closeConfirmModal() {
 async function saveConfirmedProduct() {
   const name = document.getElementById('confirm-product-name').value.trim();
   if (!name || !pendingBarcode) return;
+  // Snapshot these before closeConfirmModal() resets pendingBarcode to null.
   const barcode = pendingBarcode;
+  const category = selectedCategory;
 
   closeConfirmModal();
 
@@ -2493,7 +2515,7 @@ async function saveConfirmedProduct() {
     grocery_list_id: currentGroceryListId,
     name,
     checked: false,
-    category: selectedCategory,
+    category,
   });
   if (addError) {
     console.error('Grocery add failed:', addError.message);
@@ -2501,19 +2523,26 @@ async function saveConfirmedProduct() {
     return;
   }
 
-  showToast(`Tillagd: ${name}`);
+  // Clear confirmation so it's obvious the save landed, even when the
+  // scanner reopens on top.
+  showToast(`✓ Tillagd: ${name}`);
 
-  // --- Write to product_cache (first writer wins, skip duplicates) ---
-  // Postgres error code 23505 = unique constraint violation = barcode
-  // already cached. That's not an error for us — it just means someone
-  // scanned this product before. Every other error we want to know about.
-  const { error: cacheError } = await db.from('product_cache').insert({
-    barcode,
-    product_name: name,
-  });
-  if (cacheError && cacheError.code !== '23505') {
+  // --- Upsert into product_cache so the category choice sticks ---
+  // We upsert (instead of plain insert) so that re-picking a different
+  // category on a future scan updates the stored one. `onConflict: 'barcode'`
+  // relies on the UNIQUE constraint on the barcode column.
+  const { error: cacheError } = await db
+    .from('product_cache')
+    .upsert({ barcode, product_name: name, category }, { onConflict: 'barcode' });
+  if (cacheError) {
     console.warn('Cache write failed:', cacheError.message);
   }
+
+  // --- Stay on the scan screen so the user can keep scanning ---
+  // openScanner() restarts the camera stream fresh. Tiny flicker is fine;
+  // it's the simplest way to guarantee a clean ZXing decoder state for
+  // the next code (avoids stale `handled` flags from the previous run).
+  openScanner();
 }
 
 document.getElementById('confirm-product-save').addEventListener('click', saveConfirmedProduct);
