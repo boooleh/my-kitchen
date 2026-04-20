@@ -330,6 +330,30 @@
     line-height: 1.4;
   }
 
+  .category-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+  .category-chip {
+    padding: 7px 12px;
+    border-radius: 100px;
+    border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: var(--gray-1);
+    color: var(--gray-4);
+    cursor: pointer;
+    transition: transform 0.15s var(--ease-spring), background 0.15s, color 0.15s;
+  }
+  .category-chip:hover:not(.selected) { background: var(--gray-2); transform: scale(1.04); }
+  .category-chip.selected {
+    background: var(--orange);
+    color: #fff;
+  }
+
   .grocery-list { padding: 0 24px; display: flex; flex-direction: column; gap: 4px; }
   .grocery-list.no-animate .grocery-item { animation: none; }
 
@@ -1340,6 +1364,15 @@
   }
   .account-signout:hover { background: var(--gray-2); color: var(--black); }
 
+  .account-version {
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--gray-3);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: 0.03em;
+    margin-top: 18px;
+  }
+
   /* ── AVATAR PICKER ── */
   .account-avatar-hero {
     display: flex; align-items: center;
@@ -1523,6 +1556,7 @@
       </div>
     </div>
     <button class="account-signout" id="account-signout">Logga ut</button>
+    <div class="account-version" id="account-version"></div>
   </div>
 </div>
 
@@ -1624,6 +1658,8 @@
       autocorrect="off"
       autocapitalize="sentences" />
     <div class="confirm-product-meta" id="confirm-product-meta"></div>
+    <label class="modal-label">Kategori</label>
+    <div class="category-picker" id="category-picker"></div>
     <button class="modal-save-btn" id="confirm-product-save" type="button">Lägg till</button>
   </div>
 </div>
@@ -1823,6 +1859,9 @@ function loadZxing() {
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
 const APP_VERSION = '2.1.0';
+
+// Show the running version as a small footer in the account menu.
+document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
 
 async function checkForUpdate() {
   try {
@@ -2372,10 +2411,43 @@ document.getElementById('scanner-close').addEventListener('click', closeScanner)
 // confirmed so the save handler can write it to product_cache.
 let pendingBarcode = null;
 
+// Which category will be used when we hit "Lägg till". Starts as the
+// auto-detected guess and follows the user's name edits until they
+// manually pick a chip — after that, their choice wins.
+let selectedCategory = 'other';
+let userPickedCategory = false;
+
+// Rebuilds the grid of category chips, highlighting the selected one.
+// We generate from CATEGORIES + an "Övrigt" fallback so adding a new
+// category in the data also adds a new chip — no HTML to touch.
+function renderCategoryPicker() {
+  const picker = document.getElementById('category-picker');
+  picker.innerHTML = '';
+  const allCats = [...CATEGORIES, { key: 'other', label: '🛍️ Övrigt' }];
+  allCats.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'category-chip' + (cat.key === selectedCategory ? ' selected' : '');
+    btn.textContent = cat.label;
+    btn.addEventListener('click', () => {
+      selectedCategory = cat.key;
+      userPickedCategory = true;  // lock in — don't auto-change after this
+      renderCategoryPicker();
+    });
+    picker.appendChild(btn);
+  });
+}
+
 function openConfirmModal(barcode, prefilledName, source) {
   pendingBarcode = barcode;
   const input = document.getElementById('confirm-product-name');
   input.value = prefilledName || '';
+
+  // Fresh state each time the modal opens — otherwise a previous manual
+  // choice would stick around into the next scan.
+  userPickedCategory = false;
+  selectedCategory = prefilledName ? categorize(prefilledName) : 'other';
+  renderCategoryPicker();
 
   // Little meta line under the input: shows the barcode for context and
   // where the prefill came from. Helps you trust what you're seeing.
@@ -2421,7 +2493,7 @@ async function saveConfirmedProduct() {
     grocery_list_id: currentGroceryListId,
     name,
     checked: false,
-    category: categorize(name),
+    category: selectedCategory,
   });
   if (addError) {
     console.error('Grocery add failed:', addError.message);
@@ -2447,6 +2519,16 @@ async function saveConfirmedProduct() {
 document.getElementById('confirm-product-save').addEventListener('click', saveConfirmedProduct);
 document.getElementById('confirm-product-name').addEventListener('keydown', e => {
   if (e.key === 'Enter') saveConfirmedProduct();
+});
+// Live-update the category suggestion as the user types — but only while
+// they haven't manually picked one. Once they tap a chip, their choice wins.
+document.getElementById('confirm-product-name').addEventListener('input', e => {
+  if (userPickedCategory) return;
+  const guess = categorize(e.target.value) || 'other';
+  if (guess !== selectedCategory) {
+    selectedCategory = guess;
+    renderCategoryPicker();
+  }
 });
 // Tap outside the modal body to close (matches existing modal behaviour)
 document.getElementById('confirm-product-modal').addEventListener('click', e => {
