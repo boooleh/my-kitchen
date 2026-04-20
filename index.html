@@ -1927,7 +1927,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.1.6';
+const APP_VERSION = '2.1.7';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2571,6 +2571,22 @@ async function lookupProduct(barcode) {
 // light would stay on in the background.
 let scannerControls = null;
 
+// Live-status state — used to nudge the user with progressively more
+// specific hints when a scan is taking a while. `scanStartTime` resets
+// whenever the scanner opens OR right after a successful fast-path scan
+// (since the scanner stays open for continuous scanning). `statusPhase`
+// tracks which hint is currently shown so we don't re-set the same text
+// on every tick of the interval.
+//   phase 0 → "Rikta kameran mot streckkoden" (initial)
+//   phase 1 → "Håll still och prova närmare" (after 3s)
+//   phase 2 → "Försök med bättre ljus" (after 7s)
+//   phase 3 → "Håll still – nästan där..." (when ZXing returns a
+//              non-NotFoundException err, meaning it saw something
+//              barcode-like but couldn't decode it)
+let liveStatusTimer = null;
+let scanStartTime = 0;
+let statusPhase = 0;
+
 async function openScanner() {
   const overlay = document.getElementById('scanner-overlay');
   const video = document.getElementById('scanner-video');
@@ -2629,6 +2645,12 @@ async function openScanner() {
               category: product.category,
               upsertCache: false, // data's already in cache, no need to rewrite
             });
+            // Scanner stays open — reset the live-status timer so the next
+            // scan starts fresh with phase 0 copy, not "Försök med bättre
+            // ljus" that might be leftover from the previous attempt.
+            scanStartTime = Date.now();
+            statusPhase = 0;
+            setStatus('Rikta kameran mot streckkoden', true);
             // Short lockout so the same barcode doesn't re-fire from the
             // next video frame; a different barcode can still trigger.
             setTimeout(() => { handled = false; }, 1500);
@@ -2643,14 +2665,55 @@ async function openScanner() {
               product?.category || null,
             );
           }
+        } else if (
+          err &&
+          err.constructor?.name &&
+          err.constructor.name !== 'NotFoundException' &&
+          statusPhase !== 3
+        ) {
+          // ZXing fires `err` every frame that didn't decode — almost
+          // always NotFoundException (no barcode found at all). But when
+          // it returns FormatException or ChecksumException, it means the
+          // library DID see a barcode-shaped pattern and tried to decode
+          // it — it's just blurry, partial, or corrupted. That's a much
+          // stronger "you're close" signal than the timing hints below.
+          setStatus('Håll still – nästan där...', true);
+          statusPhase = 3;
+          // Fall back to the general timing hints after 1.5s if no
+          // successful read follows.
+          setTimeout(() => {
+            if (scannerControls && statusPhase === 3) {
+              statusPhase = 0;
+              scanStartTime = Date.now();
+              setStatus('Rikta kameran mot streckkoden', true);
+            }
+          }, 1500);
         }
-        // ZXing calls back continuously; `err` is fired for every frame that
-        // didn't decode. That's normal, so we only log real failures.
       }
     );
     // Phase 3 — camera is live, decoder is running. Steady-green dot
     // tells the eye at a glance that things are ready.
     setStatus('Rikta kameran mot streckkoden', true);
+
+    // Start the live-status timer. Every 500 ms we check how long we've
+    // been scanning and bump the copy to a more actionable hint. This
+    // tells the user that something IS happening even when ZXing hasn't
+    // found a barcode yet — no more "is it even working?" guessing.
+    scanStartTime = Date.now();
+    statusPhase = 0;
+    liveStatusTimer = setInterval(() => {
+      // Skip ticking while the "nästan där" state is showing — that's
+      // driven by ZXing's err callback and has its own revert timer.
+      if (statusPhase === 3) return;
+      const elapsed = Date.now() - scanStartTime;
+      if (elapsed > 7000 && statusPhase < 2) {
+        setStatus('Försök med bättre ljus', true);
+        statusPhase = 2;
+      } else if (elapsed > 3000 && statusPhase < 1) {
+        setStatus('Håll still och prova närmare', true);
+        statusPhase = 1;
+      }
+    }, 500);
   } catch (err) {
     console.error('Scanner error:', err);
     if (err.name === 'NotAllowedError') {
@@ -2666,6 +2729,14 @@ function closeScanner() {
     scannerControls.stop();
     scannerControls = null;
   }
+  // Kill the live-status interval so it doesn't keep running (and
+  // potentially try to update text on a hidden element) after the
+  // scanner has closed.
+  if (liveStatusTimer) {
+    clearInterval(liveStatusTimer);
+    liveStatusTimer = null;
+  }
+  statusPhase = 0;
   document.getElementById('scanner-overlay').classList.remove('open');
 }
 
