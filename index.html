@@ -274,6 +274,31 @@
     font-weight: 500;
     z-index: 3;
     text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  /* Small dot that pulses while loading, then turns steady-green once
+     the camera is live. Gives the status line a visible "heartbeat" so
+     waits feel active, not frozen. */
+  .scanner-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--orange);
+    flex-shrink: 0;
+    animation: scanner-pulse 1.1s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(255, 107, 53, 0.6);
+  }
+  .scanner-status.ready .scanner-dot {
+    background: #4ade80;
+    animation: none;
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.7);
+  }
+  @keyframes scanner-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.8); }
+    50%      { opacity: 1;    transform: scale(1.15); }
   }
 
   /* ── NEW VERSION BANNER ── */
@@ -1670,7 +1695,10 @@
   <video class="scanner-video" id="scanner-video" playsinline muted></video>
   <div class="scanner-frame"></div>
   <button class="scanner-close" id="scanner-close" aria-label="Stäng">✕</button>
-  <div class="scanner-status" id="scanner-status">Öppnar kameran…</div>
+  <div class="scanner-status" id="scanner-status">
+    <span class="scanner-dot"></span>
+    <span id="scanner-status-text">Laddar skanner…</span>
+  </div>
 </div>
 
 <!-- NEW VERSION BANNER -->
@@ -1868,6 +1896,10 @@ let addMode = 'manual';
 // only when they actually tap the scan button. This helper downloads the
 // library on first call and caches the promise so subsequent scans are instant.
 let zxingPromise = null;
+// Flips to true the moment the library is in memory. openScanner reads
+// this to decide whether to show "Laddar skanner…" (first ever scan)
+// or jump straight to "Öppnar kameran…" (every scan after).
+let zxingReady = false;
 
 function loadZxing() {
   // If we've already started loading (or finished), reuse the same promise.
@@ -1876,6 +1908,7 @@ function loadZxing() {
 
   zxingPromise = import('https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm')
     .then(module => {
+      zxingReady = true;
       console.log('✅ ZXing loaded');
       return module;
     })
@@ -1894,7 +1927,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.1.2';
+const APP_VERSION = '2.1.5';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2542,13 +2575,27 @@ async function openScanner() {
   const overlay = document.getElementById('scanner-overlay');
   const video = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
+  const statusText = document.getElementById('scanner-status-text');
+
+  // Tiny helper — keeps status copy + "ready" flag (steady-green dot)
+  // in one call so the dot state never drifts from the label.
+  const setStatus = (text, ready = false) => {
+    statusText.textContent = text;
+    status.classList.toggle('ready', ready);
+  };
 
   overlay.classList.add('open');
-  status.textContent = 'Öppnar kameran…';
+  // Phase 1 (download). If ZXing is already in memory from an earlier
+  // scan in this session, skip straight to the camera phase so we
+  // don't flash a misleading "loading" message.
+  setStatus(zxingReady ? 'Öppnar kameran…' : 'Laddar skanner…');
 
   try {
     // Lazy-load ZXing — first scan of the session triggers the download.
     const zxing = await loadZxing();
+    // Phase 2 (camera handshake) — the library is parsed, now we're
+    // waiting on getUserMedia + the first video frame.
+    setStatus('Öppnar kameran…');
     const reader = new zxing.BrowserMultiFormatReader();
 
     // Prefer the back ("environment") camera on phones. On desktop it just
@@ -2601,13 +2648,15 @@ async function openScanner() {
         // didn't decode. That's normal, so we only log real failures.
       }
     );
-    status.textContent = 'Rikta kameran mot streckkoden';
+    // Phase 3 — camera is live, decoder is running. Steady-green dot
+    // tells the eye at a glance that things are ready.
+    setStatus('Rikta kameran mot streckkoden', true);
   } catch (err) {
     console.error('Scanner error:', err);
     if (err.name === 'NotAllowedError') {
-      status.textContent = 'Kamera-åtkomst nekades';
+      setStatus('Kamera-åtkomst nekades');
     } else {
-      status.textContent = 'Kunde inte öppna kameran 😕';
+      setStatus('Kunde inte öppna kameran 😕');
     }
   }
 }
