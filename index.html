@@ -2107,7 +2107,6 @@ async function loadPublicRecipes() {
     .from('recipes')
     .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)')
     .eq('is_public', true)
-    .neq('household_id', currentHousehold.id)
     .order('created_at', { ascending: false });
   if (error) { console.error('Error loading public recipes:', error.message); return; }
   publicRecipes = (data || []).map(mapRecipe);
@@ -3153,8 +3152,8 @@ function renderRecipes() {
   const filtered = recipes.filter(r => {
     const matchFilter = activeFilter === 'all' ||
       (activeFilter === 'quick' && r.meta.includes('min') && parseInt(r.meta) <= 30) ||
-      (activeFilter === 'family' && r.tag.toLowerCase().includes('family')) ||
-      (activeFilter === 'veggie' && (r.tag.toLowerCase().includes('veggie') || r.tag.toLowerCase().includes('veg')));
+      (activeFilter === 'family' && (r.tag.toLowerCase().includes('family') || r.tag.toLowerCase().includes('familj'))) ||
+      (activeFilter === 'veggie' && (r.tag.toLowerCase().includes('veggie') || r.tag.toLowerCase().includes('veg') || r.tag.toLowerCase().includes('vegetarisk') || r.tag.toLowerCase().includes('veggo')));
     const matchSearch = r.name.toLowerCase().includes(search) ||
       r.tag.toLowerCase().includes(search);
     return matchFilter && matchSearch;
