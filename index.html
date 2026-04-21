@@ -1405,7 +1405,11 @@
     width: 100%; max-width: 430px;
     max-height: 85vh;
     overflow-y: auto;
-    animation: slideUp 0.4s var(--ease-spring);
+    animation: slideUpSheet 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @keyframes slideUpSheet {
+    from { transform: translateY(100%); opacity: 0.6; }
+    to   { transform: translateY(0);    opacity: 1; }
   }
   .account-handle { width: 36px; height: 4px; background: var(--gray-2); border-radius: 2px; margin: 0 auto 24px; }
   .account-title { font-family: 'Raleway', sans-serif; font-weight: 700; font-size: 1.1rem; color: var(--black); margin-bottom: 20px; }
@@ -1927,7 +1931,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.1.9';
+const APP_VERSION = '2.1.10';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
