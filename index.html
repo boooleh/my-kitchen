@@ -1649,7 +1649,7 @@
         <div class="grocery-sub" id="grocery-count">0 varor</div>
       </div>
       <form class="grocery-add" autocomplete="off" onsubmit="return false;">
-        <input class="grocery-input" id="grocery-input" type="search" autocomplete="new-password" autocorrect="off" placeholder="Lägg till en vara..." />
+        <input class="grocery-input" id="grocery-input" type="text" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" enterkeyhint="done" placeholder="Lägg till en vara..." />
         <button class="scan-btn" id="grocery-scan-btn" type="button" aria-label="Skanna streckkod">📷</button>
         <button class="add-btn" id="grocery-add-btn" type="button">+</button>
       </form>
@@ -1931,7 +1931,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.1.10';
+const APP_VERSION = '2.2.11';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
