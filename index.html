@@ -1973,7 +1973,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.4.5';
+const APP_VERSION = '2.4.6';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2061,7 +2061,14 @@ function subscribeToGrocery() {
         }
       } else if (payload.eventType === 'UPDATE') {
         const idx = groceryItems.findIndex(i => i.id === payload.new.id);
-        if (idx !== -1) { groceryItems[idx] = payload.new; updateGroceryItemInDOM(payload.new); }
+        if (idx !== -1) {
+          const changed = groceryItems[idx].checked !== payload.new.checked
+                       || groceryItems[idx].name    !== payload.new.name;
+          groceryItems[idx] = payload.new;
+          // Only re-render if something actually changed — skips the
+          // redundant re-draw that fires right after an optimistic update.
+          if (changed) updateGroceryItemInDOM(payload.new);
+        }
       } else if (payload.eventType === 'DELETE') {
         groceryItems = groceryItems.filter(i => i.id !== payload.old.id);
         renderGrocery();
