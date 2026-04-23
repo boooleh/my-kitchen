@@ -416,7 +416,7 @@
     top: 0; right: 0; bottom: 0;
     width: 0;
     background: #ff3b30;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: flex-end;
     padding-right: 18px;
@@ -424,6 +424,7 @@
     overflow: hidden;
     pointer-events: none;
   }
+  .delete-reveal.active { display: flex; }
   .delete-reveal-label {
     color: white;
     font-size: 0.8rem;
@@ -503,13 +504,14 @@
   }
 
   .grocery-category-header {
-    padding: 14px 24px 6px;
+    padding: 14px 0 6px;
     font-family: 'Raleway', sans-serif;
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--gray-3);
+    text-align: left;
   }
 
   .grocery-divider {
@@ -1969,7 +1971,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.4.12';
+const APP_VERSION = '2.4.2';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -1995,7 +1997,11 @@ async function checkForUpdate() {
 checkForUpdate();
 
 document.getElementById('update-reload').addEventListener('click', () => {
-  location.reload();
+  // location.reload() respects the browser cache and may serve the old
+  // index.html again, causing the banner to reappear. Instead we navigate
+  // to a cache-busted URL so the browser is forced to fetch a fresh copy.
+  const url = location.pathname + '?t=' + Date.now();
+  location.replace(url);
 });
 
 // ── SUPABASE GROCERY SYNC ──
@@ -2254,7 +2260,8 @@ function categorize(name) {
 
 function getCategoryLabel(key) {
   const cat = CATEGORIES.find(c => c.key === key);
-  return cat ? cat.label : '🛍️ Övrigt';
+  const label = cat ? cat.label : 'Övrigt';
+  return label.replace(/^\p{Emoji_Presentation}\s*/u, '').trim();
 }
 
 // ── GROCERY HELPERS ──
@@ -2339,6 +2346,7 @@ function attachGroceryRowGestures(el, item) {
       el.style.transform = `translateX(${currentDx}px)`;
       const reveal = el.querySelector('.delete-reveal');
       if (reveal) {
+        reveal.classList.add('active');
         reveal.style.width = Math.abs(currentDx) + 'px';
         reveal.classList.toggle('past-threshold', currentDx < -DELETE_THRESHOLD);
       }
@@ -2367,7 +2375,7 @@ function attachGroceryRowGestures(el, item) {
         // Short of the threshold — snap back home.
         el.style.transform = '';
         const reveal = el.querySelector('.delete-reveal');
-        if (reveal) { reveal.style.width = '0'; reveal.classList.remove('past-threshold'); }
+        if (reveal) { reveal.style.width = '0'; reveal.classList.remove('active', 'past-threshold'); }
       }
     }
 
@@ -2383,7 +2391,7 @@ function attachGroceryRowGestures(el, item) {
     el.classList.remove('swiping');
     el.style.transform = '';
     const reveal = el.querySelector('.delete-reveal');
-    if (reveal) { reveal.style.width = '0'; reveal.classList.remove('past-threshold'); }
+    if (reveal) { reveal.style.width = '0'; reveal.classList.remove('active', 'past-threshold'); }
     startX = startY = null;
     currentDx = 0;
     isSwipe = false;
