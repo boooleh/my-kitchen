@@ -401,6 +401,7 @@
     gap: 12px;
     padding: 13px 14px;
     border-radius: var(--radius-sm);
+    overflow: hidden;
     cursor: pointer;
     /* touch-action: pan-y lets the browser handle vertical scroll while
        leaving horizontal drags for our swipe-to-delete handler. */
@@ -410,6 +411,28 @@
     transition: background 0.15s, transform 0.2s var(--ease-spring);
     animation: slideIn 0.3s var(--ease-spring);
   }
+  .delete-reveal {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 0;
+    background: #ff3b30;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 18px;
+    gap: 6px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .delete-reveal-label {
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .delete-reveal.past-threshold .delete-reveal-label { opacity: 1; }
   .grocery-item.swiping {
     /* While the finger is down we want the row to follow instantly,
        so we turn the transform transition off during the drag. */
@@ -1946,7 +1969,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.3.11';
+const APP_VERSION = '2.4.12';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2240,6 +2263,10 @@ function createGroceryElement(item) {
   el.className = 'grocery-item' + (item.checked ? ' checked' : '');
   el.dataset.id = item.id;
   el.innerHTML = `
+    <div class="delete-reveal">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+      <span class="delete-reveal-label">Ta bort</span>
+    </div>
     <div class="check-circle">${item.checked ? '✓' : ''}</div>
     <div class="grocery-item-name">${item.name}</div>
     <button class="grocery-item-edit" type="button">Ändra</button>
@@ -2310,6 +2337,11 @@ function attachGroceryRowGestures(el, item) {
     if (isSwipe) {
       currentDx = Math.min(0, dx); // left-only — no rubber-band to the right
       el.style.transform = `translateX(${currentDx}px)`;
+      const reveal = el.querySelector('.delete-reveal');
+      if (reveal) {
+        reveal.style.width = Math.abs(currentDx) + 'px';
+        reveal.classList.toggle('past-threshold', currentDx < -DELETE_THRESHOLD);
+      }
     }
   });
 
@@ -2334,6 +2366,8 @@ function attachGroceryRowGestures(el, item) {
       } else {
         // Short of the threshold — snap back home.
         el.style.transform = '';
+        const reveal = el.querySelector('.delete-reveal');
+        if (reveal) { reveal.style.width = '0'; reveal.classList.remove('past-threshold'); }
       }
     }
 
@@ -2348,6 +2382,8 @@ function attachGroceryRowGestures(el, item) {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
     el.classList.remove('swiping');
     el.style.transform = '';
+    const reveal = el.querySelector('.delete-reveal');
+    if (reveal) { reveal.style.width = '0'; reveal.classList.remove('past-threshold'); }
     startX = startY = null;
     currentDx = 0;
     isSwipe = false;
