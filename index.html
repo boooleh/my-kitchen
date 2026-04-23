@@ -129,9 +129,8 @@
     white-space: nowrap;
   }
   .nav-btn.active {
-    background: var(--white);
-    color: var(--black);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    background: var(--orange);
+    color: var(--white);
   }
 
   /* ── SCREENS ── */
@@ -169,7 +168,20 @@
     line-height: 1.3;
     margin-bottom: 4px;
   }
-  .grocery-sub { font-size: 0.82rem; color: var(--gray-4); }
+  .grocery-sub { font-size: 0.82rem; color: var(--gray-4); margin-bottom: 12px; }
+  .grocery-progress-track {
+    height: 6px;
+    background: var(--gray-2);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .grocery-progress-bar {
+    height: 6px;
+    background: var(--orange);
+    border-radius: 99px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
 
   .grocery-add {
     display: flex;
@@ -1637,8 +1649,8 @@
 
   <!-- NAV -->
   <div class="nav">
-    <button class="nav-btn" data-tab="grocery">🛒 Inköp</button>
-    <button class="nav-btn" data-tab="recipes">📖 Recept</button>
+    <button class="nav-btn" data-tab="grocery">Inköp</button>
+    <button class="nav-btn" data-tab="recipes">Recept</button>
   </div>
 
   <!-- GROCERY SCREEN -->
@@ -1647,6 +1659,9 @@
       <div class="grocery-header">
         <div class="grocery-title">Inköpslista</div>
         <div class="grocery-sub" id="grocery-count">0 varor</div>
+        <div class="grocery-progress-track">
+          <div class="grocery-progress-bar" id="grocery-progress-bar"></div>
+        </div>
       </div>
       <form class="grocery-add" autocomplete="off" onsubmit="return false;">
         <input class="grocery-input" id="grocery-input" type="text" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" enterkeyhint="done" placeholder="Lägg till en vara..." />
@@ -1931,7 +1946,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.2.11';
+const APP_VERSION = '2.3.11';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2389,7 +2404,20 @@ document.addEventListener('click', (e) => {
 function updateGroceryMeta() {
   const hasChecked = groceryItems.some(i => i.checked);
   const isEmpty = groceryItems.length === 0;
-  document.getElementById('grocery-count').textContent = groceryItems.length + (groceryItems.length !== 1 ? ' varor' : ' vara');
+  const total = groceryItems.length;
+  const checked = groceryItems.filter(i => i.checked).length;
+  const countEl = document.getElementById('grocery-count');
+  const progressBar = document.getElementById('grocery-progress-bar');
+  if (isEmpty) {
+    countEl.textContent = '0 varor';
+    progressBar.style.width = '0%';
+  } else if (checked === 0) {
+    countEl.textContent = total + (total !== 1 ? ' varor' : ' vara');
+    progressBar.style.width = '0%';
+  } else {
+    countEl.textContent = checked + ' av ' + total + ' klara';
+    progressBar.style.width = Math.round((checked / total) * 100) + '%';
+  }
   document.getElementById('grocery-divider').style.display = hasChecked ? 'block' : 'none';
   document.getElementById('clear-checked').style.display = hasChecked ? 'block' : 'none';
   document.getElementById('grocery-empty').style.display = isEmpty ? 'block' : 'none';
@@ -2435,12 +2463,10 @@ function renderGrocery(skipAnimation = false) {
   } else {
     list.classList.remove('no-animate');
   }
-  const count = document.getElementById('grocery-count');
   const divider = document.getElementById('grocery-divider');
   const clearBtn = document.getElementById('clear-checked');
   const unchecked = groceryItems.filter(i => !i.checked);
   const checked = groceryItems.filter(i => i.checked);
-  count.textContent = groceryItems.length + (groceryItems.length !== 1 ? ' varor' : ' vara');
   list.innerHTML = '';
 
   // Group unchecked items by category
