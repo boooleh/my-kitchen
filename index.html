@@ -400,7 +400,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 13px 14px;
+    padding: 13px 14px 13px 0;
     border-radius: var(--radius-sm);
     overflow: hidden;
     cursor: pointer;
@@ -1973,7 +1973,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.4.3';
+const APP_VERSION = '2.4.4';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
