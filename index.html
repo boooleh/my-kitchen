@@ -2431,7 +2431,23 @@ function attachGroceryRowGestures(el, item) {
     // Normal tap → toggle checked.
     const current = groceryItems.find(i => i.id === item.id);
     if (!current) return;
-    await db.from('grocery_items').update({ checked: !current.checked }).eq('id', item.id);
+
+    // Optimistic update — flip local state + move the row instantly so
+    // the toggle feels immediate. The DB write runs in the background;
+    // we roll back if it fails.
+    current.checked = !current.checked;
+    updateGroceryItemInDOM(current);
+    updateGroceryMeta();
+
+    db.from('grocery_items').update({ checked: current.checked }).eq('id', item.id)
+      .then(({ error }) => {
+        if (error) {
+          current.checked = !current.checked;
+          updateGroceryItemInDOM(current);
+          updateGroceryMeta();
+          console.error('Toggle failed:', error.message);
+        }
+      });
   });
 }
 
