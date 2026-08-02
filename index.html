@@ -2455,7 +2455,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.10.1';
+const APP_VERSION = '2.10.2';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2907,9 +2907,27 @@ function showToast(msg) {
 // Only buttons with a data-tab are real screen tabs. The account button
 // lives in the same bar but opens a sheet, so it's excluded from both the
 // active-state toggle and the click handler below.
+const TAB_KEY = 'mitt-kok-tab';
+const TABS = ['home', 'grocery', 'recipes'];
+
+// Which tab to open on load. Validated against the list above so an old or
+// hand-edited value can't leave the app on a screen that doesn't exist.
+function rememberedTab() {
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    if (TABS.includes(saved)) return saved;
+  } catch (e) {
+    // Private browsing can make localStorage throw — fall back silently.
+  }
+  return 'home';
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.nav-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + tab));
+  // Remembered so a reload — or the PWA being reopened — puts you back where
+  // you were instead of bouncing you to Hem.
+  try { localStorage.setItem(TAB_KEY, tab); } catch (e) {}
 }
 
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
@@ -4890,7 +4908,7 @@ async function checkHousehold() {
       currentHousehold = household;
       updateAccountPanel();
       hideAuthScreens();
-      switchTab('home');
+      switchTab(rememberedTab());
       await loadGrocery();
       subscribeToGrocery();
       await loadRecipes();
@@ -4948,6 +4966,8 @@ document.getElementById('household-submit').addEventListener('click', async () =
 
   updateAccountPanel();
   hideAuthScreens();
+  // Deliberately Hem, not the remembered tab — you've just created or joined
+  // a household, so there's no previous place to return to.
   switchTab('home');
   await loadGrocery();
   subscribeToGrocery();
@@ -5170,7 +5190,7 @@ async function initApp() {
   }
 }
 
-switchTab('home');
+switchTab(rememberedTab());
 renderGrocery();
 renderRecipes();
 initApp();
