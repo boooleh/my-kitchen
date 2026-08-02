@@ -907,7 +907,15 @@
     transition: background 0.2s;
   }
   .modal-input:focus, .modal-textarea:focus { background: var(--gray-2); }
-  .modal-textarea { resize: none; height: 90px; line-height: 1.5; }
+  /* Grows with its content (see autoGrow in the script) rather than being a
+     fixed 90px box you have to scroll inside. overflow:hidden stops a
+     scrollbar flashing while the height is being recalculated. */
+  .modal-textarea {
+    resize: none;
+    min-height: 108px;
+    overflow-y: hidden;
+    line-height: 1.6;
+  }
 
   .modal-save-btn {
     width: 100%;
@@ -2250,7 +2258,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '2.8.1';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -3924,6 +3932,29 @@ const FOOD_EMOJIS = [
 
 const MODAL_FIELDS = ['recipe-name-input','recipe-meta-input','recipe-tag-input','recipe-ingredients-input','recipe-steps-input'];
 
+// ── AUTO-GROWING TEXTAREAS ──
+// The ingredient and step boxes used to be locked at 90px (about four lines),
+// so a longer recipe meant typing into a small scrolling window inside an
+// already-scrolling modal. Now each box grows to fit its content and only the
+// modal scrolls.
+//
+// Resetting height to 'auto' first is required: scrollHeight reports the
+// content height *or* the current height, whichever is larger, so without the
+// reset the box could only ever grow, never shrink when you delete lines.
+function autoGrow(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+function refreshTextareaSizes() {
+  document.querySelectorAll('#add-modal .modal-textarea').forEach(autoGrow);
+}
+
+document.querySelectorAll('#add-modal .modal-textarea').forEach(el => {
+  el.addEventListener('input', () => autoGrow(el));
+});
+
 function initEmojiPicker() {
   const grid = document.getElementById('emoji-grid');
   grid.innerHTML = '';
@@ -4024,6 +4055,8 @@ function openEditModal(recipe) {
 
   pushModalHistory();
   document.getElementById('add-modal').classList.add('open');
+  // Must run after .open — a hidden element reports scrollHeight 0.
+  refreshTextareaSizes();
 }
 
 document.getElementById('detail-edit-btn').addEventListener('click', () => {
@@ -4036,6 +4069,7 @@ document.getElementById('recipe-add-btn').addEventListener('click', () => {
   resetAddModal();
   pushModalHistory();
   document.getElementById('add-modal').classList.add('open');
+  refreshTextareaSizes();
 });
 
 document.getElementById('add-modal').addEventListener('click', e => {
