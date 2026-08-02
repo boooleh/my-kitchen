@@ -2455,7 +2455,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.10.0';
+const APP_VERSION = '2.10.1';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2532,7 +2532,9 @@ async function getOrCreateGroceryList() {
   return created?.id || null;
 }
 
-async function loadGrocery() {
+// `quiet` skips the entry animation. A resync re-renders a list you're already
+// looking at, and replaying the animation every time reads as a flash.
+async function loadGrocery(quiet = false) {
   currentGroceryListId = await getOrCreateGroceryList();
   if (!currentGroceryListId) return;
 
@@ -2543,7 +2545,7 @@ async function loadGrocery() {
     .order('created_at', { ascending: true });
   if (!error) {
     groceryItems = data || [];
-    renderGrocery();
+    renderGrocery(quiet);
   }
 }
 
@@ -2555,16 +2557,30 @@ async function loadGrocery() {
 // channel reports an error — we refetch from the database and resubscribe.
 let realtimeHealthy = true;
 let resyncTimer = null;
+let resyncInProgress = false;
+let lastResyncAt = 0;
+const RESYNC_COOLDOWN_MS = 5000;
 
 async function resyncEverything() {
   if (!currentHousehold || !currentUser) return;
+
+  // Two guards so a resync can never trigger another resync:
+  //   - in-progress flag: resubscribing fires channel status events, and
+  //     those must not start a second pass while this one is still running
+  //   - cooldown: even if several triggers land at once (waking up while
+  //     also reconnecting to wifi), we only actually resync once
+  if (resyncInProgress) return;
+  if (Date.now() - lastResyncAt < RESYNC_COOLDOWN_MS) return;
+  resyncInProgress = true;
+  lastResyncAt = Date.now();
+
   try {
     // Always refresh the socket's token before rebuilding channels — the old
     // one may well be why we're resyncing in the first place.
     const { data: { session } } = await db.auth.getSession();
     if (session?.access_token) db.realtime.setAuth(session.access_token);
 
-    await loadGrocery();
+    await loadGrocery(true);
     subscribeToGrocery();
     await loadRecipes();
     subscribeToRecipes();
@@ -2572,6 +2588,8 @@ async function resyncEverything() {
     realtimeHealthy = true;
   } catch (e) {
     console.warn('Resync failed, will retry on next wake:', e);
+  } finally {
+    resyncInProgress = false;
   }
 }
 
@@ -2635,7 +2653,7 @@ window.addEventListener('pageshow', (e) => {
 
 function subscribeToGrocery() {
   if (groceryChannel) groceryChannel.unsubscribe();
-  groceryChannel = db.channel('grocery-' + currentGroceryListId)
+  const channel = db.channel('grocery-' + currentGroceryListId)
     .on('postgres_changes', {
       event: '*',
       schema: 'public',
@@ -2661,18 +2679,31 @@ function subscribeToGrocery() {
         groceryItems = groceryItems.filter(i => i.id !== payload.old.id);
         renderGrocery();
       }
-    })
-    // Without this callback a failed subscription is completely silent — the
-    // app looks fine and simply never receives another update.
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        realtimeHealthy = true;
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        realtimeHealthy = false;
-        console.warn('Grocery realtime lost:', status, '— resyncing shortly');
-        scheduleResync();
-      }
     });
+
+  // Assign before subscribing: the callback can fire immediately, and the
+  // guard inside it compares against this variable.
+  groceryChannel = channel;
+
+  // Without this callback a failed subscription is completely silent — the
+  // app looks fine and simply never receives another update.
+  channel.subscribe((status) => {
+    // Ignore anything from a channel we've already replaced. Calling
+    // unsubscribe() above makes the OLD channel report CLOSED, and without
+    // this guard that would look like a failure on the new one.
+    if (groceryChannel !== channel) return;
+
+    if (status === 'SUBSCRIBED') {
+      realtimeHealthy = true;
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      // CLOSED is deliberately not treated as an error — it's the normal
+      // result of us closing a channel on purpose. Treating it as a failure
+      // created an endless resubscribe loop that repainted the list forever.
+      realtimeHealthy = false;
+      console.warn('Grocery realtime lost:', status, '— resyncing shortly');
+      scheduleResync();
+    }
+  });
 }
 
 // ── SUPABASE RECIPE SYNC ──
@@ -2746,7 +2777,7 @@ async function fetchOneRecipe(id) {
 
 function subscribeToRecipes() {
   if (recipesChannel) recipesChannel.unsubscribe();
-  recipesChannel = db.channel('recipes-' + currentHousehold.id)
+  const channel = db.channel('recipes-' + currentHousehold.id)
     .on('postgres_changes', {
       event: '*',
       schema: 'public',
@@ -2780,14 +2811,19 @@ function subscribeToRecipes() {
           renderRecipes();
         }, 300);
       }
-    })
-    .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        realtimeHealthy = false;
-        console.warn('Recipe realtime lost:', status, '— resyncing shortly');
-        scheduleResync();
-      }
     });
+
+  recipesChannel = channel;
+
+  channel.subscribe((status) => {
+    // Same guard as the grocery channel — see the comment there.
+    if (recipesChannel !== channel) return;
+    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      realtimeHealthy = false;
+      console.warn('Recipe realtime lost:', status, '— resyncing shortly');
+      scheduleResync();
+    }
+  });
 }
 
 async function loadPublicRecipes() {
