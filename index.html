@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -61,6 +61,23 @@
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  /* ── KEYBOARD FOCUS ──
+     Several rules below set `outline: none`, which was harmless on phones but
+     leaves desktop keyboard users with no idea where they are. :focus-visible
+     only matches when the browser judges a visible indicator appropriate —
+     i.e. keyboard navigation, not mouse clicks — so this restores the ring
+     for Tab users without putting an outline on every tapped button. */
+  :focus-visible {
+    outline: 2.5px solid var(--orange);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  /* Inputs already change background on focus; give them the ring too. */
+  input:focus-visible, textarea:focus-visible {
+    outline: 2.5px solid var(--orange);
+    outline-offset: 1px;
+  }
   input[type="search"]::-webkit-search-cancel-button,
   input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
 
@@ -642,7 +659,7 @@
   }
   .header-add-btn {
     flex-shrink: 0;
-    width: 38px; height: 38px;
+    width: 44px; height: 44px;
     border: none;
     border-radius: 50%;
     background: var(--orange);
@@ -677,7 +694,7 @@
   }
   .toolbar-search-btn {
     flex-shrink: 0;
-    width: 32px; height: 32px;
+    width: 44px; height: 44px;
     border: none;
     border-radius: 50%;
     background: var(--gray-1);
@@ -722,14 +739,21 @@
   .recipe-search input::placeholder { color: var(--gray-3); }
   .search-close {
     flex-shrink: 0;
-    width: 26px; height: 26px;
+    width: 34px; height: 34px;
     border: none;
     border-radius: 50%;
     background: var(--gray-2);
     color: var(--gray-4);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    /* Visually 34px, but the tap area is padded out to 44px. */
+    position: relative;
+  }
+  .search-close::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
   }
   .search-close:hover { background: var(--gray-3); color: var(--white); }
 
@@ -754,7 +778,9 @@
     font-family: 'Plus Jakarta Sans', sans-serif;
   }
   .filter-chip:hover { transform: scale(1.05); }
-  .filter-chip.active { background: var(--black); color: #fff; }
+  /* Was black — orange now, so "selected" means the same thing everywhere
+     in the app (nav, plan button, chips). */
+  .filter-chip.active { background: var(--orange); color: #fff; }
   .filter-chip:not(.active) { background: var(--gray-1); color: var(--gray-4); }
 
   .recipe-list { padding: 0 24px; display: flex; flex-direction: column; gap: 8px; }
@@ -801,46 +827,89 @@
     color: var(--orange);
     font-family: 'Plus Jakarta Sans', sans-serif;
   }
+  /* This button sits inside a card that is itself clickable, so it needs to
+     read as its own target: a full-height 44px hit area with a divider
+     separating it from the card body. */
   .recipe-plan-btn {
     flex-shrink: 0;
-    width: 34px; height: 34px;
-    border-radius: 50%;
+    align-self: stretch;
+    width: 44px;
+    min-height: 44px;
+    margin: -16px -16px -16px 0;
+    padding: 0;
     border: none;
-    background: var(--white);
-    color: var(--gray-4);
-    font-size: 0.95rem;
+    border-left: 1px solid var(--gray-2);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    background: transparent;
+    color: var(--gray-3);
+    font-size: 1rem;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
-    transition: all 0.2s var(--ease-spring);
+    transition: background 0.15s, color 0.15s;
+  }
+  .recipe-plan-btn:hover { background: var(--gray-2); color: var(--gray-4); }
+  .recipe-plan-btn.active { color: var(--orange); }
+  .recipe-plan-btn.active:hover { background: var(--orange-light); }
+  #home-empty { display: none; }
+
+  .home-grocery-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: calc(100% - 48px);
+    margin: 0 24px 24px;
+    padding: 16px;
+    background: var(--gray-1);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    transition: transform 0.2s var(--ease-spring), box-shadow 0.2s;
+  }
+  .home-grocery-card:hover { transform: scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  .home-grocery-icon {
+    width: 44px; height: 44px;
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.35rem;
+    flex-shrink: 0;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   }
-  .recipe-plan-btn:hover { transform: scale(1.1); }
-  .recipe-plan-btn.active {
-    background: var(--orange);
-    color: var(--white);
+  .home-grocery-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .home-grocery-title {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--black);
   }
-  .home-empty { display: none; text-align: center; padding: 48px 32px; }
-  .home-empty-btn {
+  .home-grocery-sub { font-size: 0.78rem; color: var(--gray-4); }
+  .home-grocery-chevron { color: var(--gray-3); font-size: 1.4rem; flex-shrink: 0; }
+
+  /* One empty state used by every list — grocery, recipes and home. */
+  .list-empty { text-align: center; padding: 44px 24px; }
+  .list-empty-icon { font-size: 2.2rem; margin-bottom: 10px; }
+  .list-empty-title {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--black);
+    margin-bottom: 5px;
+  }
+  .list-empty-sub { font-size: 0.85rem; color: var(--gray-4); }
+  .list-empty-btn {
+    margin-top: 18px;
     background: var(--orange);
     color: var(--white);
     border: none;
-    padding: 10px 22px;
+    padding: 11px 22px;
     border-radius: 100px;
     font-family: 'Raleway', sans-serif;
     font-weight: 700;
     font-size: 0.85rem;
     cursor: pointer;
   }
-
-  /* Shown in place of the list when there's nothing to show. */
-  .list-empty { text-align: center; padding: 44px 24px; }
-  .list-empty-title {
-    font-family: 'Raleway', sans-serif;
-    font-weight: 700;
-    color: var(--black);
-    margin-bottom: 4px;
-  }
-  .list-empty-sub { font-size: 0.85rem; color: var(--gray-4); }
 
   /* ── FRIDGE AI ── */
   /* ── ADD RECIPE MODAL ── */
@@ -1279,43 +1348,6 @@
   .detail-step-text { flex: 1; }
 
   /* ── COOKING MODE ── */
-  .cooking-rotate-prompt {
-    display: none;
-    position: absolute;
-    inset: 0;
-    background: var(--white);
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    z-index: 10;
-  }
-  .cooking-rotate-icon {
-    font-size: 3rem;
-    animation: rotateHint 1.5s ease-in-out infinite;
-  }
-  @keyframes rotateHint {
-    0%, 100% { transform: rotate(0deg); }
-    50% { transform: rotate(90deg); }
-  }
-  .cooking-rotate-text {
-    font-family: 'Raleway', sans-serif;
-    font-weight: 700;
-    font-size: 1.1rem;
-    color: var(--black);
-  }
-  .cooking-rotate-sub {
-    font-size: 0.85rem;
-    color: var(--gray-4);
-  }
-  /* Only nag about rotating on phone-sized screens — a tall desktop window
-     is portrait too, and "rotate your phone" makes no sense there. */
-  @media (orientation: portrait) and (max-width: 899px) {
-    .cooking-modal.open .cooking-rotate-prompt { display: flex; }
-  }
-  @media (orientation: landscape) {
-    .cooking-rotate-prompt { display: none !important; }
-  }
 
   .cooking-modal {
     position: fixed;
@@ -1386,6 +1418,50 @@
     overflow: hidden;
   }
 
+  /* ── PORTRAIT COOKING LAYOUT ──
+     A phone propped in a kitchen is usually upright, so instead of demanding
+     you rotate, the two columns stack: ingredients collapse into a tappable
+     strip at the top, steps take everything below. */
+  @media (orientation: portrait) {
+    .cooking-body {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+    .cooking-ingredients-panel {
+      border-right: none;
+      border-bottom: 1px solid var(--gray-2);
+      max-height: 34vh;
+      padding: 14px 20px;
+    }
+    .cooking-panel-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      margin-bottom: 10px;
+      padding: 6px 0;
+      min-height: 32px;
+      cursor: pointer;
+      color: var(--gray-4);
+    }
+    .cooking-ing-chevron {
+      display: block;
+      font-size: 0.9rem;
+      transition: transform 0.2s var(--ease-out);
+    }
+    /* Collapsed: hide the list and let the steps panel expand. */
+    .cooking-body.ingredients-collapsed .cooking-ingredients-panel {
+      max-height: none;
+      overflow: hidden;
+    }
+    .cooking-body.ingredients-collapsed #cooking-ingredients-list { display: none; }
+    .cooking-body.ingredients-collapsed .cooking-panel-label { margin-bottom: 0; }
+    .cooking-body.ingredients-collapsed .cooking-ing-chevron { transform: rotate(180deg); }
+
+    .cooking-steps-panel { padding: 20px; }
+    .cooking-step-num-big { font-size: 3rem; margin-right: 14px; }
+  }
+
   /* Left: ingredients */
   .cooking-ingredients-panel {
     border-right: 1px solid var(--gray-2);
@@ -1395,7 +1471,13 @@
   .cooking-ingredients-panel::-webkit-scrollbar { width: 4px; }
   .cooking-ingredients-panel::-webkit-scrollbar-thumb { background: var(--gray-2); border-radius: 2px; }
 
+  /* Styled as a plain label in landscape; becomes a real toggle in portrait. */
   .cooking-panel-label {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    text-align: left;
     font-family: 'Raleway', sans-serif;
     font-size: 0.65rem;
     font-weight: 700;
@@ -1403,7 +1485,10 @@
     text-transform: uppercase;
     color: var(--gray-3);
     margin-bottom: 14px;
+    padding: 0;
+    cursor: default;
   }
+  .cooking-ing-chevron { display: none; }
 
   .cooking-ingredient-item {
     display: flex;
@@ -1949,12 +2034,24 @@
         <div class="recipes-title">Den här veckan</div>
         <div class="recipes-sub" id="home-count">0 recept planerade</div>
       </div>
+      <!-- Grocery snapshot: gives Home something useful even in a week with
+           nothing planned, and doubles as a shortcut into Inköp. -->
+      <button class="home-grocery-card" id="home-grocery-card">
+        <span class="home-grocery-icon">🛒</span>
+        <span class="home-grocery-text">
+          <span class="home-grocery-title" id="home-grocery-title">Inköpslistan är tom</span>
+          <span class="home-grocery-sub" id="home-grocery-sub">Inget kvar att handla</span>
+        </span>
+        <span class="home-grocery-chevron">›</span>
+      </button>
+
+      <div class="section-label">Planerat</div>
       <div class="recipe-list" id="home-list"></div>
-      <div class="home-empty" id="home-empty">
-        <div style="font-size:2rem;margin-bottom:8px;">🗓️</div>
-        <div style="font-family:'Raleway',sans-serif;font-weight:700;color:var(--black);margin-bottom:4px;">Inget planerat än</div>
-        <div style="font-size:0.85rem;color:var(--gray-4);margin-bottom:18px;">Gå till Recept och markera vad ni ska laga den här veckan</div>
-        <button class="home-empty-btn" id="home-go-recipes">Bläddra recept</button>
+      <div class="list-empty" id="home-empty">
+        <div class="list-empty-icon">🗓️</div>
+        <div class="list-empty-title">Inget planerat än</div>
+        <div class="list-empty-sub">Gå till Recept och markera vad ni ska laga den här veckan</div>
+        <button class="list-empty-btn" id="home-go-recipes">Bläddra recept</button>
       </div>
     </div>
   </div>
@@ -1976,10 +2073,10 @@
       </form>
       <div class="section-label" id="grocery-section-label">Varor</div>
       <div class="grocery-list" id="grocery-list"></div>
-      <div id="grocery-empty" style="display:none; text-align:center; padding: 40px 24px; color: var(--gray-3);">
-        <div style="font-size: 2.5rem; margin-bottom: 12px;">🛒</div>
-        <div style="font-family: 'Raleway', sans-serif; font-weight: 700; font-size: 0.95rem; color: var(--gray-4); margin-bottom: 6px;">Din lista är tom</div>
-        <div style="font-size: 0.82rem;">Lägg till din första vara ovan</div>
+      <div class="list-empty" id="grocery-empty" style="display:none;">
+        <div class="list-empty-icon">🛒</div>
+        <div class="list-empty-title">Din lista är tom</div>
+        <div class="list-empty-sub">Lägg till din första vara ovan</div>
       </div>
       <div class="grocery-divider" id="grocery-divider" style="display:none;"></div>
       <button class="clear-btn" id="clear-checked" style="display:none;">Rensa markerade varor</button>
@@ -2147,12 +2244,6 @@
 
 <!-- COOKING MODE -->
 <div class="cooking-modal" id="cooking-modal">
-  <div class="cooking-rotate-prompt">
-    <div class="cooking-rotate-icon">📱</div>
-    <div class="cooking-rotate-text">Rotera telefonen</div>
-    <div class="cooking-rotate-sub">Liggande läge ger bäst upplevelse</div>
-    <button onclick="closeCookingMode()" style="margin-top:32px;padding:14px 32px;background:var(--orange);color:#fff;border:none;border-radius:50px;font-family:'Raleway',sans-serif;font-weight:800;font-size:1rem;cursor:pointer;">Stäng</button>
-  </div>
   <div class="cooking-header">
     <div class="cooking-title-row">
       <span class="cooking-emoji" id="cooking-emoji"></span>
@@ -2167,7 +2258,9 @@
   <div class="cooking-body" id="cooking-body">
     <!-- Left: ingredients -->
     <div class="cooking-ingredients-panel">
-      <div class="cooking-panel-label">Ingredienser</div>
+      <button class="cooking-panel-label" id="cooking-ing-toggle" type="button">
+        Ingredienser<span class="cooking-ing-chevron">⌃</span>
+      </button>
       <div id="cooking-ingredients-list"></div>
     </div>
 
@@ -2258,7 +2351,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.8.1';
+const APP_VERSION = '2.9.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2387,14 +2480,21 @@ function mapRecipe(row) {
   };
 }
 
+// Swedish sorts å ä ö *after* z, so a plain a < b comparison puts them in the
+// wrong place. localeCompare with 'sv' gets the alphabet right.
+function byName(a, b) {
+  return a.name.localeCompare(b.name, 'sv', { sensitivity: 'base' });
+}
+
 async function loadRecipes() {
   const { data, error } = await db
     .from('recipes')
     .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)')
-    .eq('household_id', currentHousehold.id)
-    .order('created_at', { ascending: false });
+    .eq('household_id', currentHousehold.id);
   if (error) { console.error('Error loading recipes:', error.message); return; }
-  recipes = (data || []).map(mapRecipe);
+  // Sorted here rather than in the query — Postgres would use its own collation,
+  // which doesn't match Swedish alphabetical order.
+  recipes = (data || []).map(mapRecipe).sort(byName);
   renderRecipes();
 }
 
@@ -2421,7 +2521,9 @@ function subscribeToRecipes() {
         // Only add if we don't already have it (avoid duplicates)
         if (!recipes.find(r => r.id === payload.new.id)) {
           const recipe = await fetchOneRecipe(payload.new.id);
-          if (recipe) { recipes.unshift(recipe); renderRecipes(); }
+          // Re-sort rather than unshift, so a recipe added on another phone
+          // lands in the right alphabetical slot instead of jumping to the top.
+          if (recipe) { recipes.push(recipe); recipes.sort(byName); renderRecipes(); }
         }
       } else if (payload.eventType === 'DELETE') {
         recipes = recipes.filter(r => r.id !== payload.old.id);
@@ -2432,7 +2534,8 @@ function subscribeToRecipes() {
           const recipe = await fetchOneRecipe(payload.new.id);
           if (!recipe) return;
           const idx = recipes.findIndex(r => r.id === recipe.id);
-          if (idx !== -1) recipes[idx] = recipe;
+          // A rename changes where it belongs, so re-sort after replacing.
+          if (idx !== -1) { recipes[idx] = recipe; recipes.sort(byName); }
           // If the detail view is open for this recipe, refresh it live
           if (currentRecipe?.id === recipe.id) {
             currentRecipe = recipe;
@@ -2449,10 +2552,9 @@ async function loadPublicRecipes() {
   const { data, error } = await db
     .from('recipes')
     .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)')
-    .eq('is_public', true)
-    .order('created_at', { ascending: false });
+    .eq('is_public', true);
   if (error) { console.error('Error loading public recipes:', error.message); return; }
-  publicRecipes = (data || []).map(mapRecipe);
+  publicRecipes = (data || []).map(mapRecipe).sort(byName);
 }
 
 async function addRecipeToDB(recipeData) {
@@ -2815,6 +2917,8 @@ function addGroceryItemToDOM(item) {
 
 // ── GROCERY ──
 function renderGrocery(skipAnimation = false) {
+  // Keep the Home snapshot in step with the real list.
+  renderHomeGrocery();
   const list = document.getElementById('grocery-list');
   if (skipAnimation) {
     list.classList.add('no-animate');
@@ -3510,6 +3614,7 @@ function renderHome() {
   const count = document.getElementById('home-count');
   const planned = recipes.filter(r => r.planned);
   count.textContent = planned.length + (planned.length !== 1 ? ' recept planerade' : ' recept planerat');
+  renderHomeGrocery();
   list.innerHTML = '';
   empty.style.display = planned.length === 0 ? 'block' : 'none';
   planned.forEach(recipe => {
@@ -3535,6 +3640,27 @@ function renderHome() {
   });
 }
 
+// Grocery snapshot on Home. Called from renderHome() and from renderGrocery(),
+// so it stays accurate whichever tab you're on when the list changes.
+function renderHomeGrocery() {
+  const title = document.getElementById('home-grocery-title');
+  const sub = document.getElementById('home-grocery-sub');
+  const total = groceryItems.length;
+  const left = groceryItems.filter(i => !i.checked).length;
+
+  if (total === 0) {
+    title.textContent = 'Inköpslistan är tom';
+    sub.textContent = 'Tryck för att lägga till varor';
+  } else if (left === 0) {
+    title.textContent = 'Allt är handlat 🎉';
+    sub.textContent = `${total} ${total === 1 ? 'vara' : 'varor'} avbockade`;
+  } else {
+    title.textContent = `${left} ${left === 1 ? 'vara' : 'varor'} kvar att handla`;
+    sub.textContent = `${total - left} av ${total} avbockade`;
+  }
+}
+
+document.getElementById('home-grocery-card').addEventListener('click', () => switchTab('grocery'));
 document.getElementById('home-go-recipes').addEventListener('click', () => switchTab('recipes'));
 
 function renderRecipes() {
@@ -4260,6 +4386,12 @@ function closeCookingMode() {
 
 document.getElementById('cooking-close').addEventListener('click', closeCookingMode);
 document.getElementById('cooking-done-btn').addEventListener('click', closeCookingMode);
+
+// Ingredients collapse/expand. Only reachable in portrait — the CSS makes the
+// label a plain caption in landscape, where both columns are visible anyway.
+document.getElementById('cooking-ing-toggle').addEventListener('click', () => {
+  document.getElementById('cooking-body').classList.toggle('ingredients-collapsed');
+});
 
 
 // ── AUTH & HOUSEHOLD FLOW ──
