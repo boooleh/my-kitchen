@@ -2297,6 +2297,37 @@ const SUPABASE_URL = 'https://fygaozjvvinixywvurew.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5Z2Fvemp2dmluaXh5d3Z1cmV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjE4NzUsImV4cCI6MjA5MTYzNzg3NX0.TgINbk8iShQbok01iqgDtFJ1ZI1aVeM0ZiRw2VT5s2c';
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ── KEEPING REALTIME AUTHENTICATED ──
+// This is the fix for "my partner has to refresh to see what I added".
+//
+// Realtime checks your Row Level Security policy for EVERY subscriber on
+// EVERY change, using the JWT held on that user's websocket. Supabase access
+// tokens expire after about an hour. supabase-js keeps refreshing the token
+// used for normal queries, but the websocket keeps whatever token it was
+// given when it connected.
+//
+// So after an hour of the app sitting open, the socket is presenting an
+// expired token, the RLS check fails, and every event is dropped before it
+// reaches you. Nothing errors — the channel still reports SUBSCRIBED, which
+// is why it looks like it's working. Reloading the page fixed it only
+// because that created a brand new socket with a fresh token.
+//
+// Below we push each refreshed token onto the socket and reconnect the
+// channels, so a long-open app keeps receiving changes indefinitely.
+db.auth.onAuthStateChange((event, session) => {
+  const token = session?.access_token;
+  if (!token) return;
+
+  db.realtime.setAuth(token);
+
+  // A new token means the channels are holding the old one. Rebuild them,
+  // and refetch so anything missed during the gap is picked up.
+  if (event === 'TOKEN_REFRESHED') {
+    console.log('Auth token refreshed — reconnecting realtime');
+    scheduleResync(100);
+  }
+});
+
 // ── CONNECTION TEST ──
 db.from('households').select('count', { count: 'exact', head: true })
   .then(({ error }) => {
@@ -2351,7 +2382,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.9.0';
+const APP_VERSION = '2.9.1';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2394,9 +2425,17 @@ async function getOrCreateGroceryList() {
     .from('grocery_lists')
     .select('id')
     .eq('household_id', currentHousehold.id)
-    .maybeSingle();
+    // Was .maybeSingle(), which *errors* when more than one row matches rather
+    // than returning the first. That error made the code think no list existed,
+    // so it created another one — and each phone then subscribed to a different
+    // list and never saw the other's items.
+    //
+    // Ordering by created_at and taking the first means every device in the
+    // household deterministically lands on the same (oldest) list.
+    .order('created_at', { ascending: true })
+    .limit(1);
   if (selectError) console.error('Error finding grocery list:', selectError.message);
-  if (existing) return existing.id;
+  if (existing && existing.length > 0) return existing[0].id;
 
   // None found — create one automatically
   const { data: created, error: insertError } = await db
@@ -2404,7 +2443,19 @@ async function getOrCreateGroceryList() {
     .insert({ household_id: currentHousehold.id, name: 'Inköpslista' })
     .select('id')
     .single();
-  if (insertError) console.error('Error creating grocery list:', insertError.message);
+
+  if (insertError) {
+    // A unique index on household_id means the other phone won this race.
+    // Their list is the real one — go and fetch it instead of failing.
+    const { data: raced } = await db
+      .from('grocery_lists')
+      .select('id')
+      .eq('household_id', currentHousehold.id)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    if (raced && raced.length > 0) return raced[0].id;
+    console.error('Error creating grocery list:', insertError.message);
+  }
   return created?.id || null;
 }
 
@@ -2422,6 +2473,92 @@ async function loadGrocery() {
     renderGrocery();
   }
 }
+
+// ── REALTIME RECOVERY ──
+// Supabase Realtime is a websocket, and phones close websockets when an app is
+// backgrounded or the screen locks. Nothing replays the events you missed while
+// away, so without this the list silently goes stale until a manual reload.
+// Whenever the app comes back to the foreground — or the network returns, or a
+// channel reports an error — we refetch from the database and resubscribe.
+let realtimeHealthy = true;
+let resyncTimer = null;
+
+async function resyncEverything() {
+  if (!currentHousehold || !currentUser) return;
+  try {
+    // Always refresh the socket's token before rebuilding channels — the old
+    // one may well be why we're resyncing in the first place.
+    const { data: { session } } = await db.auth.getSession();
+    if (session?.access_token) db.realtime.setAuth(session.access_token);
+
+    await loadGrocery();
+    subscribeToGrocery();
+    await loadRecipes();
+    subscribeToRecipes();
+    startBackgroundRefresh();
+    realtimeHealthy = true;
+  } catch (e) {
+    console.warn('Resync failed, will retry on next wake:', e);
+  }
+}
+
+// Debounced: visibilitychange and online can fire together, and a dropped
+// channel may report an error more than once.
+function scheduleResync(delay = 400) {
+  clearTimeout(resyncTimer);
+  resyncTimer = setTimeout(resyncEverything, delay);
+}
+
+// Backstop poll. Realtime still delivers the instant updates; this only
+// guarantees the list can't stay wrong for long if realtime silently stops.
+// Paused while the app is hidden so it costs nothing in the background.
+const BACKGROUND_REFRESH_MS = 45000;
+let refreshTimer = null;
+
+async function quietRefreshGrocery() {
+  if (!currentGroceryListId || document.visibilityState !== 'visible') return;
+  const { data, error } = await db
+    .from('grocery_items')
+    .select('*')
+    .eq('grocery_list_id', currentGroceryListId)
+    .order('created_at', { ascending: true });
+  if (error || !data) return;
+
+  // Only touch the DOM if something actually differs, so the list doesn't
+  // flicker or lose your place every 45 seconds.
+  const sameLength = data.length === groceryItems.length;
+  const same = sameLength && data.every(row => {
+    const local = groceryItems.find(i => i.id === row.id);
+    return local && local.checked === row.checked && local.name === row.name;
+  });
+  if (same) return;
+
+  groceryItems = data;
+  renderGrocery(true);
+}
+
+function startBackgroundRefresh() {
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(quietRefreshGrocery, BACKGROUND_REFRESH_MS);
+}
+function stopBackgroundRefresh() {
+  clearInterval(refreshTimer);
+  refreshTimer = null;
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    scheduleResync();
+    startBackgroundRefresh();
+  } else {
+    stopBackgroundRefresh();
+  }
+});
+window.addEventListener('online', () => scheduleResync(200));
+window.addEventListener('pageshow', (e) => {
+  // Restored from the back/forward cache — the socket is definitely dead.
+  if (e.persisted) scheduleResync(200);
+});
 
 function subscribeToGrocery() {
   if (groceryChannel) groceryChannel.unsubscribe();
@@ -2452,7 +2589,17 @@ function subscribeToGrocery() {
         renderGrocery();
       }
     })
-    .subscribe();
+    // Without this callback a failed subscription is completely silent — the
+    // app looks fine and simply never receives another update.
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        realtimeHealthy = true;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        realtimeHealthy = false;
+        console.warn('Grocery realtime lost:', status, '— resyncing shortly');
+        scheduleResync();
+      }
+    });
 }
 
 // ── SUPABASE RECIPE SYNC ──
@@ -2545,7 +2692,13 @@ function subscribeToRecipes() {
         }, 300);
       }
     })
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        realtimeHealthy = false;
+        console.warn('Recipe realtime lost:', status, '— resyncing shortly');
+        scheduleResync();
+      }
+    });
 }
 
 async function loadPublicRecipes() {
@@ -3583,8 +3736,17 @@ async function addGroceryItem() {
   if (error) {
     console.error('Error adding grocery item:', error.message);
     showToast('Kunde inte lägga till vara 😕');
+    return;
   }
-  // Real-time INSERT handler adds the item to the DOM
+  // Show it immediately rather than waiting for the realtime event to come
+  // back to us. Previously this relied entirely on the echo, so if the
+  // websocket was down your own item never appeared on your own screen.
+  // The INSERT handler dedupes on id, so the echo is harmless when it lands.
+  if (data && !groceryItems.find(i => i.id === data.id)) {
+    groceryItems.push(data);
+    addGroceryItemToDOM(data);
+    renderHomeGrocery();
+  }
 }
 
 document.getElementById('clear-checked').addEventListener('click', async () => {
@@ -4504,6 +4666,7 @@ async function checkHousehold() {
       subscribeToGrocery();
       await loadRecipes();
       subscribeToRecipes();
+      startBackgroundRefresh();
       return;
     }
   }
@@ -4559,6 +4722,7 @@ document.getElementById('household-submit').addEventListener('click', async () =
   switchTab('home');
   await loadGrocery();
   subscribeToGrocery();
+  startBackgroundRefresh();
   renderRecipes();
   btn.disabled = false;
 });
@@ -4766,6 +4930,11 @@ async function initApp() {
   const { data: { session } } = await db.auth.getSession();
   if (session?.user) {
     currentUser = session.user;
+    // Hand the socket a valid token before any channel is created. Don't rely
+    // on the auth listener alone — restoring a stored session doesn't always
+    // emit an event, and a channel opened with the anon key gets every event
+    // filtered out by RLS.
+    db.realtime.setAuth(session.access_token);
     await checkHousehold();
   } else {
     showAuthScreen();
