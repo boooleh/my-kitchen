@@ -39,6 +39,25 @@
     --radius-lg: 26px;
     --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Width of the whole app shell. One variable drives every layer
+       (app, bottom nav, recipe detail) so they can never drift apart.
+       It grows at each breakpoint — see the @media rules further down. */
+    --shell-max: 430px;
+    /* Space the scroll area must leave free for the fixed bottom nav.
+       Becomes 0 on desktop, where the nav moves to the side. */
+    --nav-clearance: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Tablet / small desktop window: same single-column app, just roomier. */
+  @media (min-width: 768px) {
+    :root { --shell-max: 720px; }
+  }
+
+  /* Desktop: 232px side nav + 720px content = 952px shell.
+     The bottom nav is gone here, so the scroll area needs no clearance. */
+  @media (min-width: 900px) {
+    :root { --shell-max: 952px; --nav-clearance: 32px; }
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -58,7 +77,7 @@
   .app {
     background: var(--white);
     width: 100%;
-    max-width: 430px;
+    max-width: var(--shell-max);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -111,7 +130,7 @@
     left: 0; right: 0;
     margin: 0 auto;
     width: 100%;
-    max-width: 430px;
+    max-width: var(--shell-max);
     z-index: 100;
     display: flex;
     flex-shrink: 0;
@@ -144,6 +163,54 @@
   }
   .nav-btn.active .nav-btn-icon { transform: scale(1.08); }
 
+  /* ── DESKTOP: SIDE NAV ──
+     Above 900px the app becomes a two-column grid: nav on the left,
+     header and screen stacked on the right. All three .screen elements
+     share the same grid cell — only the .active one is displayed, so
+     they never collide. */
+  @media (min-width: 900px) {
+    .app {
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-areas:
+        "nav header"
+        "nav screen";
+      height: 100vh;
+      min-height: 0;
+      box-shadow: 0 0 60px rgba(0,0,0,0.06);
+    }
+
+    .header { grid-area: header; padding: 32px 32px 0; }
+    .screen { grid-area: screen; min-height: 0; }
+
+    .nav {
+      grid-area: nav;
+      position: static;
+      max-width: none;
+      width: auto;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 4px;
+      border-top: none;
+      border-right: 1px solid var(--gray-2);
+      background: var(--gray-1);
+      padding: 32px 14px;
+    }
+    .nav-btn {
+      flex: 0 0 auto;
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      border-radius: var(--radius-sm);
+    }
+    .nav-btn:hover { background: var(--gray-2); }
+    .nav-btn.active { background: var(--orange-light); color: var(--orange); }
+    .nav-btn-icon { font-size: 1.15rem; }
+  }
+
   /* ── SCREENS ── */
   .screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
   .screen.active { display: flex; animation: fadeIn 0.3s var(--ease-out); }
@@ -153,7 +220,7 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
-  .screen-scroll { overflow-y: auto; flex: 1; padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .screen-scroll { overflow-y: auto; flex: 1; padding-bottom: var(--nav-clearance); }
   .screen-scroll::-webkit-scrollbar { display: none; }
 
   /* ── SECTION LABEL ── */
@@ -330,7 +397,7 @@
     position: fixed;
     bottom: calc(78px + env(safe-area-inset-bottom, 0px));
     left: 16px; right: 16px;
-    max-width: 430px;
+    max-width: 400px;
     margin: 0 auto;
     background: var(--orange-light);
     border-radius: var(--radius-md);
@@ -884,6 +951,9 @@
   .detail-modal {
     position: fixed;
     inset: 0;
+    /* Stay inside the app shell instead of going full-bleed on desktop. */
+    max-width: var(--shell-max);
+    margin: 0 auto;
     background: var(--white);
     z-index: 200;
     display: none;
@@ -1144,7 +1214,9 @@
     font-size: 0.85rem;
     color: var(--gray-4);
   }
-  @media (orientation: portrait) {
+  /* Only nag about rotating on phone-sized screens — a tall desktop window
+     is portrait too, and "rotate your phone" makes no sense there. */
+  @media (orientation: portrait) and (max-width: 899px) {
     .cooking-modal.open .cooking-rotate-prompt { display: flex; }
   }
   @media (orientation: landscape) {
@@ -1214,7 +1286,9 @@
   .cooking-body {
     flex: 1;
     display: grid;
-    grid-template-columns: 280px 1fr;
+    /* Ingredient panel flexes between 190px and 300px instead of being
+       locked at 280px, so it doesn't crowd the steps in a small window. */
+    grid-template-columns: clamp(190px, 26%, 300px) minmax(0, 1fr);
     overflow: hidden;
   }
 
@@ -1628,6 +1702,32 @@
   .member-name { font-size: 0.88rem; font-weight: 600; color: var(--black); }
   .member-you { font-size: 0.75rem; color: var(--orange); margin-left: 4px; }
   .member-role { font-size: 0.75rem; color: var(--gray-4); margin-top: 1px; }
+
+  /* ── DESKTOP OVERRIDES FOR SHEETS & TOAST ──
+     Placed at the end of the stylesheet on purpose: these rules target the
+     same elements as the blocks above, and in CSS the later rule wins when
+     specificity is equal. Bottom sheets are a phone convention — on desktop
+     they become centred dialogs with all four corners rounded. */
+  @media (min-width: 900px) {
+    .modal-overlay,
+    .account-panel,
+    .detail-menu-overlay { align-items: center; }
+
+    .modal,
+    .account-sheet {
+      border-radius: var(--radius-lg);
+      padding-bottom: 28px;
+    }
+    .detail-menu-sheet {
+      max-width: 380px;
+      border-radius: var(--radius-lg);
+      padding-bottom: 12px;
+    }
+    .detail-menu-handle { display: none; }
+
+    .toast { bottom: 32px; }
+    .update-banner { bottom: 32px; }
+  }
 </style>
 </head>
 <body>
@@ -2054,7 +2154,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.5.2';
+const APP_VERSION = '2.6.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
