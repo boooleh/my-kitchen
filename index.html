@@ -1138,7 +1138,7 @@
     font-family: 'Raleway', sans-serif;
     font-weight: 700;
     font-size: 1.1rem;
-    color: #fff;
+    color: var(--black);
   }
   .cooking-rotate-sub {
     font-size: 0.85rem;
@@ -1180,14 +1180,14 @@
     font-family: 'Raleway', sans-serif;
     font-weight: 800;
     font-size: 1rem;
-    color: #fff;
+    color: var(--black);
   }
   .cooking-close {
     background: var(--gray-1);
     border: none;
     border-radius: 50%;
     width: 36px; height: 36px;
-    color: #fff;
+    color: var(--black);
     font-size: 1rem;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
@@ -1315,7 +1315,7 @@
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: clamp(1.1rem, 2.5vw, 1.5rem);
     font-weight: 400;
-    color: #fff;
+    color: var(--black);
     line-height: 1.6;
     animation: stepFadeIn 0.35s var(--ease-out);
   }
@@ -1337,11 +1337,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: var(--gray-2);
+    background: var(--gray-1);
     border: none;
     border-radius: 100px;
     padding: 12px 22px;
-    color: #fff;
+    color: var(--black);
     font-family: 'Raleway', sans-serif;
     font-weight: 700;
     font-size: 0.85rem;
@@ -1350,9 +1350,9 @@
   }
   .cooking-nav-btn:hover { background: var(--gray-2); transform: scale(1.04); }
   .cooking-nav-btn:disabled { opacity: 0.2; pointer-events: none; }
-  .cooking-nav-btn.next { background: var(--orange); }
+  .cooking-nav-btn.next { background: var(--orange); color: #fff; }
   .cooking-nav-btn.next:hover { background: #e85a24; }
-  .cooking-nav-btn.done { background: #2ecc71; }
+  .cooking-nav-btn.done { background: #2ecc71; color: #fff; }
   .cooking-nav-btn.done:hover { background: #27ae60; }
 
   /* Finished screen */
@@ -1372,7 +1372,7 @@
     font-family: 'Raleway', sans-serif;
     font-size: 2rem;
     font-weight: 800;
-    color: #fff;
+    color: var(--black);
     margin-bottom: 8px;
   }
   .cooking-done-sub { font-size: 1rem; color: var(--gray-4); margin-bottom: 32px; }
@@ -2054,7 +2054,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.5.1';
+const APP_VERSION = '2.5.2';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
