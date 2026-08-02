@@ -104,34 +104,39 @@
   }
   .avatar-btn:hover { transform: scale(1.1); }
 
-  /* ── NAV TABS ── */
+  /* ── BOTTOM NAV ── */
   .nav {
+    order: 10;
     display: flex;
-    gap: 4px;
-    background: var(--gray-1);
-    border-radius: 14px;
-    padding: 4px;
-    margin: 0 24px 24px;
     flex-shrink: 0;
+    background: var(--white);
+    border-top: 1px solid var(--gray-2);
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
   }
   .nav-btn {
     flex: 1;
-    padding: 9px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 4px;
     border: none;
-    border-radius: 11px;
+    border-radius: 12px;
     background: transparent;
-    font-family: 'Raleway', sans-serif;
-    font-size: 0.82rem;
-    font-weight: 700;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 600;
     color: var(--gray-4);
     cursor: pointer;
     transition: all 0.2s var(--ease-out);
     white-space: nowrap;
   }
+  .nav-btn-icon { font-size: 1.3rem; line-height: 1; }
   .nav-btn.active {
-    background: var(--orange);
-    color: var(--white);
+    color: var(--orange);
   }
+  .nav-btn.active .nav-btn-icon { transform: scale(1.08); }
 
   /* ── SCREENS ── */
   .screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
@@ -317,7 +322,7 @@
   /* ── NEW VERSION BANNER ── */
   .update-banner {
     position: fixed;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
     left: 16px; right: 16px;
     max-width: 430px;
     margin: 0 auto;
@@ -632,6 +637,36 @@
     background: var(--orange-light);
     color: var(--orange);
     font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .recipe-plan-btn {
+    flex-shrink: 0;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: var(--white);
+    color: var(--gray-4);
+    font-size: 0.95rem;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-spring);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .recipe-plan-btn:hover { transform: scale(1.1); }
+  .recipe-plan-btn.active {
+    background: var(--orange);
+    color: var(--white);
+  }
+  .home-empty { display: none; text-align: center; padding: 48px 32px; }
+  .home-empty-btn {
+    background: var(--orange);
+    color: var(--white);
+    border: none;
+    padding: 10px 22px;
+    border-radius: 100px;
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
   }
 
   .recipe-add-card {
@@ -1020,6 +1055,18 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
+  /* A sub-heading inside the ingredient list (e.g. "Örter").
+     Shown when an ingredient line ends with a colon. */
+  .detail-ingredient-heading {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin: 16px 0 4px;
+  }
+  .detail-ingredient-heading:first-child { margin-top: 0; }
   .detail-steps { display: flex; flex-direction: column; gap: 6px; }
   .detail-step {
     display: flex;
@@ -1212,6 +1259,16 @@
     background: var(--orange);
     border-color: var(--orange);
   }
+  /* Sub-heading inside the cooking-mode ingredient list */
+  .cooking-ingredient-heading {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin: 14px 0 4px;
+  }
 
   /* Right: steps */
   .cooking-steps-panel {
@@ -1330,7 +1387,7 @@
   /* ── TOAST ── */
   .toast {
     position: fixed;
-    bottom: 32px;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%) translateY(80px);
     background: var(--black);
@@ -1676,8 +1733,26 @@
 
   <!-- NAV -->
   <div class="nav">
-    <button class="nav-btn" data-tab="grocery">Inköp</button>
-    <button class="nav-btn" data-tab="recipes">Recept</button>
+    <button class="nav-btn" data-tab="home"><span class="nav-btn-icon">🏠</span>Hem</button>
+    <button class="nav-btn" data-tab="grocery"><span class="nav-btn-icon">🛒</span>Inköp</button>
+    <button class="nav-btn" data-tab="recipes"><span class="nav-btn-icon">📖</span>Recept</button>
+  </div>
+
+  <!-- HOME SCREEN -->
+  <div class="screen" id="screen-home">
+    <div class="screen-scroll">
+      <div class="recipes-header">
+        <div class="recipes-title">Den här veckan</div>
+        <div class="recipes-sub" id="home-count">0 recept planerade</div>
+      </div>
+      <div class="recipe-list" id="home-list"></div>
+      <div class="home-empty" id="home-empty">
+        <div style="font-size:2rem;margin-bottom:8px;">🗓️</div>
+        <div style="font-family:'Raleway',sans-serif;font-weight:700;color:var(--black);margin-bottom:4px;">Inget planerat än</div>
+        <div style="font-size:0.85rem;color:var(--gray-4);margin-bottom:18px;">Gå till Recept och markera vad ni ska laga den här veckan</div>
+        <button class="home-empty-btn" id="home-go-recipes">Bläddra recept</button>
+      </div>
+    </div>
   </div>
 
   <!-- GROCERY SCREEN -->
@@ -1973,7 +2048,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.4.6';
+const APP_VERSION = '2.5.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2091,6 +2166,7 @@ function mapRecipe(row) {
     tag: row.tag || '',
     created_by: row.created_by,
     is_public: row.is_public || false,
+    planned: row.planned || false,
     image_url: row.image_url || null,
     ingredients: (row.recipe_ingredients || [])
       .sort((a, b) => a.sort_order - b.sort_order)
@@ -3204,7 +3280,52 @@ document.getElementById('clear-checked').addEventListener('click', async () => {
 });
 
 // ── RECIPES ──
+async function togglePlanned(recipe) {
+  const newValue = !recipe.planned;
+  const { error } = await db.from('recipes').update({ planned: newValue }).eq('id', recipe.id);
+  if (error) { showToast('Kunde inte uppdatera 😕'); return; }
+  recipe.planned = newValue;
+  const idx = recipes.findIndex(r => r.id === recipe.id);
+  if (idx !== -1) recipes[idx].planned = newValue;
+  showToast(newValue ? `${recipe.name} tillagd i veckan 🗓️` : `${recipe.name} borttagen från veckan`);
+  renderRecipes();
+}
+
+function renderHome() {
+  const list = document.getElementById('home-list');
+  const empty = document.getElementById('home-empty');
+  const count = document.getElementById('home-count');
+  const planned = recipes.filter(r => r.planned);
+  count.textContent = planned.length + (planned.length !== 1 ? ' recept planerade' : ' recept planerat');
+  list.innerHTML = '';
+  empty.style.display = planned.length === 0 ? 'block' : 'none';
+  planned.forEach(recipe => {
+    const el = document.createElement('div');
+    el.className = 'recipe-card';
+    const thumb = recipe.image_url
+      ? `<img class="recipe-card-img" src="${recipe.image_url}" alt="${recipe.name}">`
+      : `<div class="recipe-emoji">${recipe.emoji}</div>`;
+    el.innerHTML = `
+      ${thumb}
+      <div class="recipe-info">
+        <div class="recipe-name">${recipe.name}</div>
+        <div class="recipe-meta">${recipe.meta}</div>
+      </div>
+      <button class="recipe-plan-btn active" title="Ta bort från veckan">✓</button>
+    `;
+    el.addEventListener('click', () => openRecipeDetail(recipe));
+    el.querySelector('.recipe-plan-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePlanned(recipe);
+    });
+    list.appendChild(el);
+  });
+}
+
+document.getElementById('home-go-recipes').addEventListener('click', () => switchTab('recipes'));
+
 function renderRecipes() {
+  renderHome();
   const list = document.getElementById('recipe-list');
   const count = document.getElementById('recipe-count');
   const sectionLabel = document.getElementById('recipe-section-label');
@@ -3271,8 +3392,13 @@ function renderRecipes() {
         <div class="recipe-meta">${recipe.meta}</div>
       </div>
       <div class="recipe-badge">${recipe.tag}${recipe.is_public ? ' 🌍' : ''}</div>
+      <button class="recipe-plan-btn${recipe.planned ? ' active' : ''}" title="${recipe.planned ? 'Ta bort från veckan' : 'Lägg till i veckan'}">${recipe.planned ? '✓' : '📅'}</button>
     `;
     el.addEventListener('click', () => openRecipeDetail(recipe));
+    el.querySelector('.recipe-plan-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePlanned(recipe);
+    });
     list.appendChild(el);
   });
 }
@@ -3287,6 +3413,18 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
     renderRecipes();
   });
 });
+
+// ── INGREDIENT SECTION HEADINGS ──
+// An ingredient line that ends with a colon (e.g. "Örter:") is treated
+// as a section heading, not a real ingredient. These two helpers spot
+// those lines and clean up the text for display.
+function isHeadingLine(text) {
+  return typeof text === 'string' && text.trim().endsWith(':');
+}
+function headingLabel(text) {
+  // "Örter:" → "Örter"  (remove the trailing colon and any spaces)
+  return text.trim().replace(/:\s*$/, '');
+}
 
 // ── RECIPE DETAIL ──
 function openRecipeDetail(recipe) {
@@ -3305,9 +3443,14 @@ function openRecipeDetail(recipe) {
   document.getElementById('detail-name').textContent = recipe.name;
   document.getElementById('detail-meta').innerHTML = `<span>⏱ ${recipe.meta}</span><span>🏷 ${recipe.tag}</span>`;
   const ingDiv = document.getElementById('detail-ingredients');
-  ingDiv.innerHTML = (recipe.ingredients || []).map(i => `
-    <div class="detail-ingredient"><div class="detail-ingredient-dot"></div>${i}</div>
-  `).join('');
+  ingDiv.innerHTML = (recipe.ingredients || []).map(i => {
+    // Colon line → section heading (no dot)
+    if (isHeadingLine(i)) {
+      return `<div class="detail-ingredient-heading">${headingLabel(i)}</div>`;
+    }
+    // Normal ingredient → orange dot + text
+    return `<div class="detail-ingredient"><div class="detail-ingredient-dot"></div>${i}</div>`;
+  }).join('');
   const stepsDiv = document.getElementById('detail-steps');
   stepsDiv.innerHTML = (recipe.steps || []).map((s, i) => `
     <div class="detail-step" data-step="${i}">
@@ -3454,7 +3597,8 @@ let ingredientSelection = [];
 
 document.getElementById('detail-add-grocery').addEventListener('click', () => {
   if (!currentRecipe) return;
-  ingredientSelection = (currentRecipe.ingredients || []).map(() => true); // all selected by default
+  // Select every real ingredient by default, but never the heading lines
+  ingredientSelection = (currentRecipe.ingredients || []).map(ing => !isHeadingLine(ing));
   renderIngredientPicker();
   pushModalHistory();
   document.getElementById('ingredient-modal').classList.add('open');
@@ -3464,6 +3608,15 @@ function renderIngredientPicker() {
   const list = document.getElementById('ingredient-pick-list');
   list.innerHTML = '';
   (currentRecipe.ingredients || []).forEach((ing, idx) => {
+    // Heading lines (e.g. "Örter:") aren't ingredients — show them as a
+    // small label and skip the checkbox so they can't be added to the list.
+    if (isHeadingLine(ing)) {
+      const h = document.createElement('div');
+      h.className = 'detail-ingredient-heading';
+      h.textContent = headingLabel(ing);
+      list.appendChild(h);
+      return;
+    }
     const el = document.createElement('div');
     el.className = 'ing-pick-item' + (ingredientSelection[idx] ? '' : ' deselected');
     el.innerHTML = `
@@ -3728,12 +3881,17 @@ async function openCookingMode(recipe) {
 
   // Ingredients
   const ingList = document.getElementById('cooking-ingredients-list');
-  ingList.innerHTML = (recipe.ingredients || []).map((ing, i) => `
+  ingList.innerHTML = (recipe.ingredients || []).map((ing, i) => {
+    // Colon line → section heading (not a tickable ingredient)
+    if (isHeadingLine(ing)) {
+      return `<div class="cooking-ingredient-heading">${headingLabel(ing)}</div>`;
+    }
+    return `
     <div class="cooking-ingredient-item" data-idx="${i}">
       <div class="cooking-ing-check"></div>
       <span>${ing}</span>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
   ingList.querySelectorAll('.cooking-ingredient-item').forEach(el => {
     el.addEventListener('click', () => {
       const idx = parseInt(el.dataset.idx);
@@ -3929,7 +4087,7 @@ async function checkHousehold() {
       currentHousehold = household;
       updateAccountPanel();
       hideAuthScreens();
-      switchTab('grocery');
+      switchTab('home');
       await loadGrocery();
       subscribeToGrocery();
       await loadRecipes();
@@ -3986,7 +4144,7 @@ document.getElementById('household-submit').addEventListener('click', async () =
 
   updateAccountPanel();
   hideAuthScreens();
-  switchTab('grocery');
+  switchTab('home');
   await loadGrocery();
   subscribeToGrocery();
   renderRecipes();
@@ -4202,7 +4360,7 @@ async function initApp() {
   }
 }
 
-switchTab('grocery');
+switchTab('home');
 renderGrocery();
 renderRecipes();
 initApp();
