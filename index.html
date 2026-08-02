@@ -887,6 +887,56 @@
   .home-grocery-sub { font-size: 0.78rem; color: var(--gray-4); }
   .home-grocery-chevron { color: var(--gray-3); font-size: 1.4rem; flex-shrink: 0; }
 
+  /* ── RATINGS ── */
+  .rating-badge { font-size: 0.95rem; line-height: 1; flex-shrink: 0; }
+
+  .rating-picker { display: flex; gap: 8px; }
+  .rating-opt {
+    width: 44px; height: 44px;
+    border: 1.5px solid var(--gray-2);
+    border-radius: 50%;
+    background: var(--white);
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    /* Unselected faces are dimmed so the chosen one clearly stands out —
+       colour alone wouldn't read on emoji. */
+    filter: grayscale(1);
+    opacity: 0.45;
+    transition: all 0.2s var(--ease-spring);
+  }
+  .rating-opt:hover { opacity: 0.8; filter: grayscale(0); transform: scale(1.08); }
+  .rating-opt.selected {
+    filter: grayscale(0);
+    opacity: 1;
+    border-color: var(--orange);
+    background: var(--orange-light);
+    transform: scale(1.05);
+  }
+  .rating-opt.big { width: 58px; height: 58px; font-size: 1.7rem; }
+
+  .rating-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 24px 0;
+  }
+  .rating-row-label {
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray-4);
+  }
+  .rating-others {
+    padding: 10px 24px 0;
+    font-size: 0.78rem;
+    color: var(--gray-4);
+  }
+
   /* One empty state used by every list — grocery, recipes and home. */
   .list-empty { text-align: center; padding: 44px 24px; }
   .list-empty-icon { font-size: 2.2rem; margin-bottom: 10px; }
@@ -1628,7 +1678,20 @@
     color: var(--black);
     margin-bottom: 8px;
   }
-  .cooking-done-sub { font-size: 1rem; color: var(--gray-4); margin-bottom: 32px; }
+  .cooking-done-sub { font-size: 1rem; color: var(--gray-4); margin-bottom: 24px; }
+  .cooking-rate-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 30px;
+  }
+  .cooking-rate-label {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--black);
+  }
   .cooking-done-btn {
     background: var(--orange);
     border: none;
@@ -2100,6 +2163,7 @@
         <button class="toolbar-search-btn" id="search-toggle" aria-label="Sök recept">🔍</button>
         <div class="recipe-filters" id="recipe-filters">
           <button class="filter-chip active" data-filter="all">Alla</button>
+          <button class="filter-chip" data-filter="favourite">Favoriter 😍</button>
           <button class="filter-chip" data-filter="quick">Snabbt ⚡</button>
           <button class="filter-chip" data-filter="family">Familj 💛</button>
           <button class="filter-chip" data-filter="veggie">Veggo 🌱</button>
@@ -2206,6 +2270,11 @@
     <div class="detail-hero" id="detail-emoji"></div>
     <div class="detail-name" id="detail-name"></div>
     <div class="detail-meta" id="detail-meta"></div>
+    <div class="rating-row">
+      <span class="rating-row-label">Vad tyckte du?</span>
+      <div class="rating-picker" id="detail-rating"></div>
+    </div>
+    <div class="rating-others" id="detail-rating-others"></div>
     <div class="detail-section">
       <div class="detail-section-title">Ingredienser</div>
       <div id="detail-ingredients"></div>
@@ -2283,6 +2352,10 @@
     <div class="cooking-done-emoji">🎉</div>
     <div class="cooking-done-title">Smaklig måltid!</div>
     <div class="cooking-done-sub" id="cooking-done-sub"></div>
+    <div class="cooking-rate-prompt" id="cooking-rate-prompt">
+      <div class="cooking-rate-label">Blev det bra?</div>
+      <div class="rating-picker" id="cooking-rating"></div>
+    </div>
     <button class="cooking-done-btn" id="cooking-done-btn">Tillbaka till receptet</button>
   </div>
 </div>
@@ -2382,7 +2455,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.9.1';
+const APP_VERSION = '2.10.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2606,7 +2679,20 @@ function subscribeToGrocery() {
 let recipesChannel = null;
 
 // Converts a Supabase recipe row (with nested ingredients/steps) to our app format
+// ── RATINGS ──
+// 1 = 😕 inte igen, 2 = 🙂 helt ok, 3 = 😍 favorit.
+const RATING_FACES = { 1: '😕', 2: '🙂', 3: '😍' };
+const RATING_LABELS = { 1: 'Inte igen', 2: 'Helt ok', 3: 'Favorit' };
+
+// The average is rounded to the nearest whole face for display, but the raw
+// value is kept too so "Favoriter" can use a threshold rather than exact 3s.
+function ratingAverage(ratings) {
+  if (!ratings || ratings.length === 0) return null;
+  return ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
+}
+
 function mapRecipe(row) {
+  const ratings = row.recipe_ratings || [];
   return {
     id: row.id,
     household_id: row.household_id,
@@ -2618,6 +2704,9 @@ function mapRecipe(row) {
     is_public: row.is_public || false,
     planned: row.planned || false,
     image_url: row.image_url || null,
+    ratings: ratings.map(r => ({ user_id: r.user_id, rating: r.rating })),
+    ratingAvg: ratingAverage(ratings),
+    myRating: ratings.find(r => r.user_id === currentUser?.id)?.rating ?? null,
     ingredients: (row.recipe_ingredients || [])
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(i => i.text),
@@ -2636,7 +2725,7 @@ function byName(a, b) {
 async function loadRecipes() {
   const { data, error } = await db
     .from('recipes')
-    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)')
+    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order), recipe_ratings(user_id, rating)')
     .eq('household_id', currentHousehold.id);
   if (error) { console.error('Error loading recipes:', error.message); return; }
   // Sorted here rather than in the query — Postgres would use its own collation,
@@ -2648,7 +2737,7 @@ async function loadRecipes() {
 async function fetchOneRecipe(id) {
   const { data, error } = await db
     .from('recipes')
-    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)')
+    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order), recipe_ratings(user_id, rating)')
     .eq('id', id)
     .single();
   if (error || !data) return null;
@@ -2704,7 +2793,7 @@ function subscribeToRecipes() {
 async function loadPublicRecipes() {
   const { data, error } = await db
     .from('recipes')
-    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)')
+    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order), recipe_ratings(user_id, rating)')
     .eq('is_public', true);
   if (error) { console.error('Error loading public recipes:', error.message); return; }
   publicRecipes = (data || []).map(mapRecipe).sort(byName);
@@ -3759,6 +3848,52 @@ document.getElementById('clear-checked').addEventListener('click', async () => {
 });
 
 // ── RECIPES ──
+// Saves (or changes) my rating for a recipe. The UNIQUE (recipe_id, user_id)
+// constraint in the database is what makes upsert overwrite my previous score
+// rather than adding a second row and skewing the average.
+async function saveRating(recipe, value) {
+  if (!currentUser) return;
+
+  // Update locally first so the faces respond instantly.
+  const existing = recipe.ratings.find(r => r.user_id === currentUser.id);
+  if (existing) existing.rating = value;
+  else recipe.ratings.push({ user_id: currentUser.id, rating: value });
+  recipe.myRating = value;
+  recipe.ratingAvg = ratingAverage(recipe.ratings);
+
+  const idx = recipes.findIndex(r => r.id === recipe.id);
+  if (idx !== -1) recipes[idx] = recipe;
+  renderRecipes();
+
+  const { error } = await db.from('recipe_ratings').upsert({
+    recipe_id: recipe.id,
+    user_id: currentUser.id,
+    rating: value
+  }, { onConflict: 'recipe_id,user_id' });
+
+  if (error) {
+    console.error('Could not save rating:', error.message);
+    showToast('Kunde inte spara betyget 😕');
+  }
+}
+
+// The small faces shown on a recipe card / detail header.
+function ratingBadgeHtml(recipe) {
+  if (recipe.ratingAvg === null) return '';
+  const face = RATING_FACES[Math.round(recipe.ratingAvg)];
+  const count = recipe.ratings.length;
+  return `<span class="rating-badge" title="${RATING_LABELS[Math.round(recipe.ratingAvg)]} · ${count} ${count === 1 ? 'röst' : 'röster'}">${face}</span>`;
+}
+
+// Builds the three-face picker. `current` highlights the active choice.
+function ratingPickerHtml(current, size = '') {
+  return [1, 2, 3].map(v => `
+    <button class="rating-opt${current === v ? ' selected' : ''}${size ? ' ' + size : ''}"
+            type="button" data-rating="${v}" aria-label="${RATING_LABELS[v]}" title="${RATING_LABELS[v]}">
+      ${RATING_FACES[v]}
+    </button>`).join('');
+}
+
 async function togglePlanned(recipe) {
   const newValue = !recipe.planned;
   const { error } = await db.from('recipes').update({ planned: newValue }).eq('id', recipe.id);
@@ -3873,6 +4008,9 @@ function renderRecipes() {
 
   const filtered = recipes.filter(r => {
     const matchFilter = activeFilter === 'all' ||
+      // Averaging 2.5+ counts as a favourite, so one 😍 and one 🙂 doesn't
+      // qualify but two 😍 (or a single 😍) does.
+      (activeFilter === 'favourite' && r.ratingAvg !== null && r.ratingAvg >= 2.5) ||
       (activeFilter === 'quick' && r.meta.includes('min') && parseInt(r.meta) <= 30) ||
       (activeFilter === 'family' && (r.tag.toLowerCase().includes('family') || r.tag.toLowerCase().includes('familj'))) ||
       (activeFilter === 'veggie' && (r.tag.toLowerCase().includes('veggie') || r.tag.toLowerCase().includes('veg') || r.tag.toLowerCase().includes('vegetarisk') || r.tag.toLowerCase().includes('veggo')));
@@ -3908,6 +4046,7 @@ function renderRecipes() {
         <div class="recipe-name">${recipe.name}</div>
         <div class="recipe-meta">${recipe.meta}</div>
       </div>
+      ${ratingBadgeHtml(recipe)}
       <div class="recipe-badge">${recipe.tag}${recipe.is_public ? ' 🌍' : ''}</div>
       <button class="recipe-plan-btn${recipe.planned ? ' active' : ''}" title="${recipe.planned ? 'Ta bort från veckan' : 'Lägg till i veckan'}">${recipe.planned ? '✓' : '📅'}</button>
     `;
@@ -3984,6 +4123,34 @@ function openRecipeDetail(recipe) {
   }
   document.getElementById('detail-name').textContent = recipe.name;
   document.getElementById('detail-meta').innerHTML = `<span>⏱ ${recipe.meta}</span><span>🏷 ${recipe.tag}</span>`;
+
+  // ── Rating ──
+  // Hidden for other households' public recipes — you can only rate your own.
+  const ratingRow = document.querySelector('#detail-modal .rating-row');
+  const othersEl = document.getElementById('detail-rating-others');
+  const ownRecipe = recipe.household_id === currentHousehold?.id;
+  ratingRow.style.display = ownRecipe ? '' : 'none';
+  othersEl.style.display = ownRecipe ? '' : 'none';
+
+  if (ownRecipe) {
+    const picker = document.getElementById('detail-rating');
+    picker.innerHTML = ratingPickerHtml(recipe.myRating);
+    picker.querySelectorAll('.rating-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        saveRating(recipe, Number(btn.dataset.rating));
+        // Re-render the detail view so the picker and the "others" line
+        // both reflect the new value with their handlers re-attached.
+        openRecipeDetail(recipe);
+      });
+    });
+
+    // How the rest of the household voted.
+    const others = recipe.ratings.filter(r => r.user_id !== currentUser?.id);
+    othersEl.textContent = others.length === 0
+      ? ''
+      : 'Övriga i hushållet: ' + others.map(r => RATING_FACES[r.rating]).join(' ');
+  }
+
   const ingDiv = document.getElementById('detail-ingredients');
   ingDiv.innerHTML = (recipe.ingredients || []).map(i => {
     // Colon line → section heading (no dot)
@@ -4445,7 +4612,7 @@ async function openCookingMode(recipe) {
 
   document.getElementById('cooking-emoji').textContent = recipe.emoji;
   document.getElementById('cooking-name').textContent = recipe.name;
-  document.getElementById('cooking-done-sub').textContent = `You just made ${recipe.name} 🍽`;
+  document.getElementById('cooking-done-sub').textContent = `Du lagade ${recipe.name} 🍽`;
 
   // Ingredients
   const ingList = document.getElementById('cooking-ingredients-list');
@@ -4537,8 +4704,34 @@ document.getElementById('cooking-next').addEventListener('click', () => {
     document.getElementById('cooking-body').style.display = 'none';
     document.getElementById('cooking-done').classList.add('visible');
     document.getElementById('cooking-progress-fill').style.width = '100%';
+    showCookingRatePrompt(currentRecipe);
   }
 });
+
+// The best moment to ask is right after eating, so the done screen carries
+// the picker. Pre-selects an existing rating so re-cooking a favourite
+// doesn't look like it was never rated.
+function showCookingRatePrompt(recipe) {
+  const wrap = document.getElementById('cooking-rate-prompt');
+  const picker = document.getElementById('cooking-rating');
+  const ownRecipe = recipe.household_id === currentHousehold?.id;
+
+  wrap.style.display = ownRecipe ? 'flex' : 'none';
+  if (!ownRecipe) return;
+
+  picker.innerHTML = ratingPickerHtml(recipe.myRating, 'big');
+  picker.querySelectorAll('.rating-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const value = Number(btn.dataset.rating);
+      saveRating(recipe, value);
+      showToast(`Betyg sparat ${RATING_FACES[value]}`);
+      // Rebuild rather than patch — this re-renders the picker with the new
+      // selection and re-attaches handlers in one step, so you can change
+      // your mind as often as you like.
+      showCookingRatePrompt(recipe);
+    });
+  });
+}
 
 function closeCookingMode() {
   document.getElementById('cooking-modal').classList.remove('open');
