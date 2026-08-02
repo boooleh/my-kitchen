@@ -633,7 +633,27 @@
   .clear-btn:hover { color: var(--orange); }
 
   /* ── RECIPES ── */
-  .recipes-header { padding: 0 24px 16px; }
+  .recipes-header {
+    padding: 0 24px 16px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .header-add-btn {
+    flex-shrink: 0;
+    width: 38px; height: 38px;
+    border: none;
+    border-radius: 50%;
+    background: var(--orange);
+    color: #fff;
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s var(--ease-spring), background 0.15s;
+  }
+  .header-add-btn:hover { transform: scale(1.08); background: #e85a24; }
   .recipes-title {
     font-family: 'Raleway', sans-serif;
     font-size: 1.25rem;
@@ -644,32 +664,84 @@
   }
   .recipes-sub { font-size: 0.82rem; color: var(--gray-4); }
 
-  .recipe-search {
-    margin: 0 24px 20px;
-    background: var(--gray-1);
-    border-radius: var(--radius-sm);
-    padding: 12px 16px;
+  /* ── RECIPE TOOLBAR (search + filters in one row) ──
+     The row is a positioning context. The chips sit in normal flow; the
+     search form is absolutely positioned on top of them and only becomes
+     visible when .searching is set, so expanding it costs no extra height. */
+  .recipe-toolbar {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    padding: 0 24px 16px;
+  }
+  .toolbar-search-btn {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: var(--gray-1);
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, transform 0.2s var(--ease-spring);
+  }
+  .toolbar-search-btn:hover { background: var(--gray-2); transform: scale(1.08); }
+  .recipe-toolbar.searching .toolbar-search-btn { visibility: hidden; }
+
+  .recipe-search {
+    position: absolute;
+    left: 24px; right: 24px;
+    top: 0;
+    background: var(--gray-1);
+    border-radius: 100px;
+    padding: 7px 8px 7px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     color: var(--gray-3);
     font-size: 0.88rem;
     cursor: text;
+    /* Hidden by default — but kept in the DOM so its value survives. */
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.97);
+    transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+  }
+  .recipe-toolbar.searching .recipe-search {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
   }
   .recipe-search input {
     border: none; background: transparent; outline: none;
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 0.88rem; color: var(--black); flex: 1;
+    min-width: 0;
   }
   .recipe-search input::placeholder { color: var(--gray-3); }
+  .search-close {
+    flex-shrink: 0;
+    width: 26px; height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: var(--gray-2);
+    color: var(--gray-4);
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .search-close:hover { background: var(--gray-3); color: var(--white); }
 
   .recipe-filters {
     display: flex;
     gap: 8px;
-    padding: 0 24px 20px;
+    flex: 1;
+    min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
   }
+  .recipe-filters::-webkit-scrollbar { display: none; }
   .filter-chip {
     flex-shrink: 0;
     padding: 6px 14px;
@@ -760,19 +832,15 @@
     cursor: pointer;
   }
 
-  .recipe-add-card {
-    border: 2px dashed var(--gray-2);
-    border-radius: var(--radius-md);
-    padding: 20px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    margin: 0 24px;
-    margin-top: 8px;
+  /* Shown in place of the list when there's nothing to show. */
+  .list-empty { text-align: center; padding: 44px 24px; }
+  .list-empty-title {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    color: var(--black);
+    margin-bottom: 4px;
   }
-  .recipe-add-card:hover { border-color: var(--orange); background: var(--orange-light); }
-  .recipe-add-card-label { font-family: 'Raleway', sans-serif; font-size: 0.85rem; font-weight: 700; color: var(--gray-3); }
-  .recipe-add-card:hover .recipe-add-card-label { color: var(--orange); }
+  .list-empty-sub { font-size: 0.85rem; color: var(--gray-4); }
 
   /* ── FRIDGE AI ── */
   /* ── ADD RECIPE MODAL ── */
@@ -1914,26 +1982,32 @@
   <div class="screen" id="screen-recipes">
     <div class="screen-scroll">
       <div class="recipes-header">
-        <div class="recipes-title">Dina recept</div>
-        <div class="recipes-sub" id="recipe-count">0 recept sparade</div>
+        <div>
+          <div class="recipes-title" id="recipe-section-label">Dina recept</div>
+          <div class="recipes-sub" id="recipe-count">0 recept sparade</div>
+        </div>
+        <button class="header-add-btn" id="recipe-add-btn" title="Lägg till recept" aria-label="Lägg till recept">+</button>
       </div>
-      <form class="recipe-search" autocomplete="off" onsubmit="return false;">
-        <span>🔍</span>
-        <input id="recipe-search" placeholder="Sök recept..." autocomplete="new-password" autocorrect="off" autocapitalize="off" />
-      </form>
-      <div class="recipe-filters" id="recipe-filters">
-        <button class="filter-chip active" data-filter="all">Alla</button>
-        <button class="filter-chip" data-filter="quick">Snabbt ⚡</button>
-        <button class="filter-chip" data-filter="family">Familj 💛</button>
-        <button class="filter-chip" data-filter="veggie">Veggo 🌱</button>
-        <button class="filter-chip" data-filter="explore">Utforska 🌍</button>
+
+      <!-- Search and filters share one row. The search button expands into a
+           full-width input that covers the chips, then collapses again. -->
+      <div class="recipe-toolbar" id="recipe-toolbar">
+        <button class="toolbar-search-btn" id="search-toggle" aria-label="Sök recept">🔍</button>
+        <div class="recipe-filters" id="recipe-filters">
+          <button class="filter-chip active" data-filter="all">Alla</button>
+          <button class="filter-chip" data-filter="quick">Snabbt ⚡</button>
+          <button class="filter-chip" data-filter="family">Familj 💛</button>
+          <button class="filter-chip" data-filter="veggie">Veggo 🌱</button>
+          <button class="filter-chip" data-filter="explore">Utforska 🌍</button>
+        </div>
+        <form class="recipe-search" id="recipe-search-form" autocomplete="off" onsubmit="return false;">
+          <span>🔍</span>
+          <input id="recipe-search" placeholder="Sök recept..." autocomplete="new-password" autocorrect="off" autocapitalize="off" />
+          <button class="search-close" id="search-close" type="button" aria-label="Stäng sök">✕</button>
+        </form>
       </div>
-      <div class="section-label" id="recipe-section-label">Sparade recept</div>
+
       <div class="recipe-list" id="recipe-list"></div>
-      <div class="recipe-add-card" id="recipe-add-btn">
-        <div style="font-size:1.5rem;margin-bottom:6px;">+</div>
-        <div class="recipe-add-card-label">Lägg till recept</div>
-      </div>
     </div>
   </div>
 
@@ -2176,7 +2250,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.8.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -3496,7 +3570,8 @@ function renderRecipes() {
   }
 
   // ── Normal mode: your household's recipes ──
-  sectionLabel.textContent = 'Sparade recept';
+  // sectionLabel is the page title now — it swaps to "Publika recept" above.
+  sectionLabel.textContent = 'Dina recept';
   addBtn.style.display = '';
   count.textContent = recipes.length + (recipes.length !== 1 ? ' recept sparade' : ' recept sparat');
 
@@ -3509,6 +3584,21 @@ function renderRecipes() {
       r.tag.toLowerCase().includes(search);
     return matchFilter && matchSearch;
   });
+
+  // The "add recipe" card used to sit at the bottom of this list and doubled
+  // as the empty state. It's a + in the header now, so an empty list needs
+  // its own message — otherwise a new household sees a blank screen.
+  if (filtered.length === 0) {
+    list.innerHTML = recipes.length === 0
+      ? `<div class="list-empty">
+           <div style="font-size:2rem;margin-bottom:8px;">📖</div>
+           <div class="list-empty-title">Inga recept än</div>
+           <div class="list-empty-sub">Tryck på + här uppe för att lägga till ert första recept</div>
+         </div>`
+      : `<div class="list-empty">
+           <div class="list-empty-sub">Inga recept matchade</div>
+         </div>`;
+  }
 
   filtered.forEach(recipe => {
     const el = document.createElement('div');
@@ -3535,6 +3625,31 @@ function renderRecipes() {
 }
 
 document.getElementById('recipe-search').addEventListener('input', renderRecipes);
+
+// ── SEARCH EXPAND / COLLAPSE ──
+// The input keeps its value while hidden, so closing the search must also
+// clear it — otherwise the list would stay filtered by an invisible term.
+const recipeToolbar = document.getElementById('recipe-toolbar');
+
+function openRecipeSearch() {
+  recipeToolbar.classList.add('searching');
+  document.getElementById('recipe-search').focus();
+}
+
+function closeRecipeSearch() {
+  recipeToolbar.classList.remove('searching');
+  const input = document.getElementById('recipe-search');
+  if (input.value) { input.value = ''; renderRecipes(); }
+  input.blur();
+}
+
+document.getElementById('search-toggle').addEventListener('click', openRecipeSearch);
+document.getElementById('search-close').addEventListener('click', closeRecipeSearch);
+
+// Escape closes the search, matching how the modals behave.
+document.getElementById('recipe-search').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeRecipeSearch();
+});
 
 document.querySelectorAll('.filter-chip').forEach(chip => {
   chip.addEventListener('click', async () => {
