@@ -94,6 +94,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    /* The 44px avatar used to set this height. It's moved to the nav now,
+       so pin the height to keep the header spacing unchanged. */
+    min-height: 44px;
     margin-bottom: 28px;
   }
   .logo {
@@ -111,17 +114,6 @@
     background: var(--orange);
     border-radius: 50%;
   }
-  .avatar-btn {
-    width: 44px; height: 44px;
-    background: var(--orange-light);
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    font-size: 1.2rem;
-    display: flex; align-items: center; justify-content: center;
-    transition: transform 0.2s var(--ease-spring);
-  }
-  .avatar-btn:hover { transform: scale(1.1); }
 
   /* ── BOTTOM NAV ── */
   .nav {
@@ -163,6 +155,16 @@
   }
   .nav-btn.active .nav-btn-icon { transform: scale(1.08); }
 
+  /* The account avatar gets a filled circle so it reads as "you",
+     not as a fourth destination. */
+  .nav-avatar {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--orange-light);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.95rem;
+  }
+
   /* ── DESKTOP: SIDE NAV ──
      Above 900px the app becomes a two-column grid: nav on the left,
      header and screen stacked on the right. All three .screen elements
@@ -188,7 +190,11 @@
       grid-area: nav;
       position: static;
       max-width: none;
-      width: auto;
+      /* The mobile bar centres itself with `margin: 0 auto`. Left as-is here
+         the auto margins eat the leftover space in the 232px grid column and
+         the sidebar floats in the middle of it — reset them so it fills. */
+      margin: 0;
+      width: 100%;
       flex-direction: column;
       justify-content: flex-start;
       gap: 4px;
@@ -209,6 +215,18 @@
     .nav-btn:hover { background: var(--gray-2); }
     .nav-btn.active { background: var(--orange-light); color: var(--orange); }
     .nav-btn-icon { font-size: 1.15rem; }
+
+    /* margin-top:auto eats all the leftover vertical space in the sidebar,
+       pushing the account button to the bottom the way Slack/Notion do. */
+    .nav-account {
+      margin-top: auto;
+      border-top: 1px solid var(--gray-2);
+      border-radius: 0;
+      padding-top: 16px;
+      margin-bottom: 0;
+    }
+    .nav-account:hover { background: transparent; }
+    .nav-avatar { width: 30px; height: 30px; font-size: 1.05rem; }
   }
 
   /* ── SCREENS ── */
@@ -1833,7 +1851,6 @@
   <div class="header">
     <div class="header-top">
       <div class="logo"><span class="logo-dot"></span> Mitt Kök</div>
-      <button class="avatar-btn">👩</button>
     </div>
   </div>
 
@@ -1842,6 +1859,11 @@
     <button class="nav-btn" data-tab="home"><span class="nav-btn-icon">🏠</span>Hem</button>
     <button class="nav-btn" data-tab="grocery"><span class="nav-btn-icon">🛒</span>Inköp</button>
     <button class="nav-btn" data-tab="recipes"><span class="nav-btn-icon">📖</span>Recept</button>
+    <!-- No data-tab: this opens the account sheet instead of switching screen,
+         and switchTab() only looks at buttons that have a data-tab. -->
+    <button class="nav-btn nav-account" id="nav-account">
+      <span class="nav-btn-icon nav-avatar" id="nav-avatar">👩</span>Konto
+    </button>
   </div>
 
   <!-- HOME SCREEN -->
@@ -2154,7 +2176,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.7.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2420,12 +2442,15 @@ function showToast(msg) {
 }
 
 // ── NAV ──
+// Only buttons with a data-tab are real screen tabs. The account button
+// lives in the same bar but opens a sheet, so it's excluded from both the
+// active-state toggle and the click handler below.
 function switchTab(tab) {
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.nav-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + tab));
 }
 
-document.querySelectorAll('.nav-btn').forEach(btn => {
+document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
@@ -4269,12 +4294,12 @@ const AVATAR_EMOJIS = [
 let currentUserAvatar = localStorage.getItem('mitt-kok-avatar') || '👩';
 
 // Apply cached avatar immediately so there's no flash on reload
-document.querySelector('.avatar-btn').textContent = currentUserAvatar;
+document.getElementById('nav-avatar').textContent = currentUserAvatar;
 
 function updateAvatarDisplays(emoji) {
   currentUserAvatar = emoji;
   localStorage.setItem('mitt-kok-avatar', emoji);
-  document.querySelector('.avatar-btn').textContent = emoji;
+  document.getElementById('nav-avatar').textContent = emoji;
   document.getElementById('account-avatar-display').textContent = emoji;
   document.querySelectorAll('.avatar-option').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.emoji === emoji);
@@ -4375,7 +4400,7 @@ function updateAccountPanel() {
   loadHouseholdMembers();
 }
 
-document.querySelector('.avatar-btn').addEventListener('click', () => {
+document.getElementById('nav-account').addEventListener('click', () => {
   initAvatarPicker();
   loadHouseholdMembers();
   pushModalHistory();
