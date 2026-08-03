@@ -852,38 +852,48 @@
   .recipe-plan-btn.active:hover { background: var(--orange-light); }
   #home-empty { display: none; }
 
-  /* Food boxes reuse .recipe-card's look — only the remove button and the
-     overdue flag are new. */
-  .foodbox-remove {
-    flex-shrink: 0;
-    align-self: stretch;
-    width: 44px;
-    min-height: 44px;
-    margin: -16px -16px -16px 0;
-    padding: 0;
-    border: none;
-    border-left: 1px solid var(--gray-2);
-    border-radius: 0 var(--radius-md) var(--radius-md) 0;
-    background: transparent;
-    color: var(--gray-3);
-    font-size: 1rem;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+  /* Matches the 24px gap already used between the grocery card and
+     "Planerat" above it, so the rhythm stays consistent down the page. */
+  .foodbox-label-spacing { margin-top: 24px; }
+
+  /* Food boxes reuse .recipe-card's colors, but tighter and smaller — they
+     carry less info (name + date) than a recipe card, so a lighter row
+     helps the eye tell "planned" and "cooked" apart at a glance. Swipe to
+     delete instead of a button, same gesture as the grocery list. */
+  .foodbox-card {
+    position: relative;
+    overflow: hidden;
+    padding: 10px 14px;
+    gap: 10px;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  .foodbox-remove:hover { background: var(--gray-2); color: var(--gray-4); }
+  .foodbox-card.swiping { transition: none; }
+  .foodbox-card.deleting {
+    transform: translateX(-100%) !important;
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+  .foodbox-card .recipe-card-img,
+  .foodbox-card .recipe-emoji {
+    width: 40px; height: 40px;
+    font-size: 1.2rem;
+  }
   .foodbox-card.overdue { box-shadow: inset 0 0 0 1.5px var(--orange); }
-  .foodbox-overdue-badge {
+
+  .foodbox-badge {
     flex-shrink: 0;
     font-size: 0.65rem;
     font-weight: 600;
     padding: 4px 10px;
     border-radius: 100px;
-    background: var(--orange);
-    color: var(--white);
+    background: var(--orange-light);
+    color: var(--orange);
     font-family: 'Plus Jakarta Sans', sans-serif;
     white-space: nowrap;
   }
+  .foodbox-badge.overdue { background: var(--orange); color: var(--white); }
 
   .home-grocery-card {
     display: flex;
@@ -2152,7 +2162,7 @@
 
       <!-- Food boxes: logged automatically when a recipe is unticked from
            "Planerat" above. Hidden entirely when there are none. -->
-      <div class="section-label" id="foodbox-label" style="display:none;">Matlådor</div>
+      <div class="section-label foodbox-label-spacing" id="foodbox-label" style="display:none;">Matlådor</div>
       <div class="recipe-list" id="foodbox-list"></div>
     </div>
   </div>
@@ -2494,7 +2504,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.11.0';
+const APP_VERSION = '2.12.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2822,11 +2832,84 @@ async function logCookedBox(recipe) {
   }
 }
 
-async function removeCookedLog(id) {
-  const { error } = await db.from('cooked_log').delete().eq('id', id);
-  if (error) { showToast('Kunde inte ta bort 😕'); return; }
-  cookedLog = cookedLog.filter(e => e.id !== id);
-  renderHomeCookedLog();
+// Swipe-to-delete for a food box row — same gesture, threshold, and red
+// reveal as the grocery list's attachGroceryRowGestures, minus the
+// long-press edit reveal (a food box has nothing to edit, only remove).
+// The DB delete is optimistic and fires in parallel with the slide-out
+// animation, then the row is dropped from the DOM once that finishes —
+// deliberately not a full re-render, so the animation gets to play out.
+function attachFoodboxSwipe(el, entry) {
+  let startX = null, startY = null;
+  let currentDx = 0;
+  let isSwipe = false;
+
+  const SWIPE_CLAIM_PX = 10;
+  const DELETE_THRESHOLD = 80;
+
+  el.addEventListener('pointerdown', (e) => {
+    if (el.classList.contains('deleting')) return;
+    startX = e.clientX;
+    startY = e.clientY;
+    currentDx = 0;
+    isSwipe = false;
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    if (startX === null) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    if (!isSwipe && dx < -SWIPE_CLAIM_PX && Math.abs(dx) > Math.abs(dy)) {
+      isSwipe = true;
+      el.classList.add('swiping');
+    }
+    if (isSwipe) {
+      currentDx = Math.min(0, dx);
+      el.style.transform = `translateX(${currentDx}px)`;
+      const reveal = el.querySelector('.delete-reveal');
+      if (reveal) {
+        reveal.classList.add('active');
+        reveal.style.width = Math.abs(currentDx) + 'px';
+        reveal.classList.toggle('past-threshold', currentDx < -DELETE_THRESHOLD);
+      }
+    }
+  });
+
+  el.addEventListener('pointerup', () => {
+    if (!isSwipe) { startX = startY = null; return; }
+    el.classList.remove('swiping');
+
+    if (currentDx < -DELETE_THRESHOLD) {
+      el.classList.add('deleting');
+      el.style.transform = '';
+      cookedLog = cookedLog.filter(e => e.id !== entry.id);
+      db.from('cooked_log').delete().eq('id', entry.id)
+        .then(({ error }) => { if (error) console.error('Delete failed:', error.message); });
+      setTimeout(() => {
+        el.remove();
+        const label = document.getElementById('foodbox-label');
+        if (label) label.style.display = cookedLog.length === 0 ? 'none' : 'block';
+      }, 260);
+    } else {
+      el.style.transform = '';
+      const reveal = el.querySelector('.delete-reveal');
+      if (reveal) { reveal.style.width = '0'; reveal.classList.remove('active', 'past-threshold'); }
+    }
+    startX = startY = null;
+    currentDx = 0;
+    isSwipe = false;
+  });
+
+  el.addEventListener('pointercancel', () => {
+    el.classList.remove('swiping');
+    el.style.transform = '';
+    const reveal = el.querySelector('.delete-reveal');
+    if (reveal) { reveal.style.width = '0'; reveal.classList.remove('active', 'past-threshold'); }
+    startX = startY = null;
+    currentDx = 0;
+    isSwipe = false;
+  });
 }
 
 function subscribeToCookedLog() {
@@ -4225,9 +4308,10 @@ function renderHomeGrocery() {
   }
 }
 
-// Food box list on Home. A box turns "overdue" at 6 days since cooked —
-// just a visual flag, nothing auto-removes it. Called from renderHome()
-// and whenever cookedLog changes (log, remove, realtime update).
+// Food box list on Home. The badge counts up "Dag 1 av 6" ... so the
+// 6-day flag isn't a surprise — it flips to "Töm nu" only once you hit it.
+// Called from renderHome() and whenever cookedLog changes (log, remove,
+// realtime update).
 function renderHomeCookedLog() {
   const label = document.getElementById('foodbox-label');
   const list = document.getElementById('foodbox-list');
@@ -4237,25 +4321,24 @@ function renderHomeCookedLog() {
 
   const sorted = [...cookedLog].sort((a, b) => new Date(b.cooked_at) - new Date(a.cooked_at));
   sorted.forEach(entry => {
-    const overdue = daysSinceCooked(entry.cooked_at) >= 6;
+    const days = daysSinceCooked(entry.cooked_at);
+    const overdue = days >= 6;
     const el = document.createElement('div');
     el.className = 'recipe-card foodbox-card' + (overdue ? ' overdue' : '');
     const thumb = entry.image_url
       ? `<img class="recipe-card-img" src="${entry.image_url}" alt="${entry.recipe_name}">`
       : `<div class="recipe-emoji">${entry.emoji || '🍽'}</div>`;
+    const badgeText = overdue ? 'Töm nu 🗑️' : `Dag ${Math.max(days, 0)} av 6`;
     el.innerHTML = `
+      <div class="delete-reveal"><span class="delete-reveal-label">Ta bort</span></div>
       ${thumb}
       <div class="recipe-info">
         <div class="recipe-name">${entry.recipe_name}</div>
         <div class="recipe-meta">${cookedDateLabel(entry.cooked_at)}</div>
       </div>
-      ${overdue ? '<div class="foodbox-overdue-badge">Töm nu 🗑️</div>' : ''}
-      <button class="foodbox-remove" title="Ta bort matlåda">✕</button>
+      <div class="foodbox-badge${overdue ? ' overdue' : ''}">${badgeText}</div>
     `;
-    el.querySelector('.foodbox-remove').addEventListener('click', (e) => {
-      e.stopPropagation();
-      removeCookedLog(entry.id);
-    });
+    attachFoodboxSwipe(el, entry);
     list.appendChild(el);
   });
 }
