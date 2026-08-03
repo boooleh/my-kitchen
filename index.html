@@ -852,6 +852,39 @@
   .recipe-plan-btn.active:hover { background: var(--orange-light); }
   #home-empty { display: none; }
 
+  /* Food boxes reuse .recipe-card's look — only the remove button and the
+     overdue flag are new. */
+  .foodbox-remove {
+    flex-shrink: 0;
+    align-self: stretch;
+    width: 44px;
+    min-height: 44px;
+    margin: -16px -16px -16px 0;
+    padding: 0;
+    border: none;
+    border-left: 1px solid var(--gray-2);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    background: transparent;
+    color: var(--gray-3);
+    font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .foodbox-remove:hover { background: var(--gray-2); color: var(--gray-4); }
+  .foodbox-card.overdue { box-shadow: inset 0 0 0 1.5px var(--orange); }
+  .foodbox-overdue-badge {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    background: var(--orange);
+    color: var(--white);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    white-space: nowrap;
+  }
+
   .home-grocery-card {
     display: flex;
     align-items: center;
@@ -2116,6 +2149,11 @@
         <div class="list-empty-sub">Gå till Recept och markera vad ni ska laga den här veckan</div>
         <button class="list-empty-btn" id="home-go-recipes">Bläddra recept</button>
       </div>
+
+      <!-- Food boxes: logged automatically when a recipe is unticked from
+           "Planerat" above. Hidden entirely when there are none. -->
+      <div class="section-label" id="foodbox-label" style="display:none;">Matlådor</div>
+      <div class="recipe-list" id="foodbox-list"></div>
     </div>
   </div>
 
@@ -2414,6 +2452,7 @@ db.from('households').select('count', { count: 'exact', head: true })
 // ── STATE ──
 let groceryItems = [];
 let recipes = [];
+let cookedLog = [];
 let publicRecipes = [];
 let activeFilter = 'all';
 let currentRecipe = null;
@@ -2455,7 +2494,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.10.2';
+const APP_VERSION = '2.11.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2584,6 +2623,8 @@ async function resyncEverything() {
     subscribeToGrocery();
     await loadRecipes();
     subscribeToRecipes();
+    await loadCookedLog();
+    subscribeToCookedLog();
     startBackgroundRefresh();
     realtimeHealthy = true;
   } catch (e) {
@@ -2709,6 +2750,135 @@ function subscribeToGrocery() {
 // ── SUPABASE RECIPE SYNC ──
 let recipesChannel = null;
 
+// ── FOOD BOX LOG ──
+// Ticking a recipe off "Planerat" logs a food box with today's date (see
+// togglePlanned below). cookedLogAvailable mirrors ratingsAvailable's trick:
+// if the cooked_log table hasn't been created yet (supabase-cooked-log.sql
+// not run), we go quiet instead of throwing errors on every toggle.
+let cookedLogChannel = null;
+let cookedLogAvailable = true;
+
+function looksLikeMissingTable(error, tableName) {
+  const msg = (error?.message || '').toLowerCase();
+  return msg.includes(tableName) || msg.includes('relation') || msg.includes('schema cache');
+}
+
+function mapCookedLog(row) {
+  return {
+    id: row.id,
+    recipe_id: row.recipe_id,
+    recipe_name: row.recipe_name,
+    emoji: row.emoji,
+    image_url: row.image_url,
+    cooked_at: row.cooked_at
+  };
+}
+
+async function loadCookedLog() {
+  if (!cookedLogAvailable) return;
+  const { data, error } = await db
+    .from('cooked_log')
+    .select('*')
+    .eq('household_id', currentHousehold.id)
+    .order('cooked_at', { ascending: false });
+
+  if (error) {
+    if (looksLikeMissingTable(error, 'cooked_log')) {
+      console.warn('cooked_log table not available yet — run supabase-cooked-log.sql to enable food boxes.');
+      cookedLogAvailable = false;
+    } else {
+      console.error('Error loading food boxes:', error.message);
+    }
+    return;
+  }
+  cookedLog = (data || []).map(mapCookedLog);
+  renderHomeCookedLog();
+}
+
+// Called from togglePlanned when a recipe is unticked — that's the moment
+// we treat as "this got cooked", so it becomes a food box on Home.
+async function logCookedBox(recipe) {
+  if (!cookedLogAvailable) return;
+  const { data, error } = await db.from('cooked_log').insert({
+    household_id: currentHousehold.id,
+    recipe_id: recipe.id,
+    recipe_name: recipe.name,
+    emoji: recipe.emoji,
+    image_url: recipe.image_url,
+    created_by: currentUser?.id || null
+  }).select().single();
+
+  if (error) {
+    if (looksLikeMissingTable(error, 'cooked_log')) {
+      cookedLogAvailable = false;
+    } else {
+      console.warn('Could not log food box:', error.message);
+    }
+    return;
+  }
+  if (!cookedLog.find(e => e.id === data.id)) {
+    cookedLog.unshift(mapCookedLog(data));
+    renderHomeCookedLog();
+  }
+}
+
+async function removeCookedLog(id) {
+  const { error } = await db.from('cooked_log').delete().eq('id', id);
+  if (error) { showToast('Kunde inte ta bort 😕'); return; }
+  cookedLog = cookedLog.filter(e => e.id !== id);
+  renderHomeCookedLog();
+}
+
+function subscribeToCookedLog() {
+  if (!cookedLogAvailable) return;
+  if (cookedLogChannel) cookedLogChannel.unsubscribe();
+  const channel = db.channel('cooked-log-' + currentHousehold.id)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'cooked_log',
+      filter: `household_id=eq.${currentHousehold.id}`
+    }, (payload) => {
+      if (payload.eventType === 'INSERT') {
+        if (!cookedLog.find(e => e.id === payload.new.id)) {
+          cookedLog.unshift(mapCookedLog(payload.new));
+          renderHomeCookedLog();
+        }
+      } else if (payload.eventType === 'DELETE') {
+        cookedLog = cookedLog.filter(e => e.id !== payload.old.id);
+        renderHomeCookedLog();
+      }
+    });
+
+  cookedLogChannel = channel;
+
+  channel.subscribe((status) => {
+    if (cookedLogChannel !== channel) return;
+    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      realtimeHealthy = false;
+      console.warn('Cooked log realtime lost:', status, '— resyncing shortly');
+      scheduleResync();
+    }
+  });
+}
+
+// Calendar-day difference, not exact 24h chunks — so something cooked this
+// morning still reads as day 0 all evening instead of flipping to day 1.
+function daysSinceCooked(dateStr) {
+  const cooked = new Date(dateStr);
+  const now = new Date();
+  const a = new Date(cooked.getFullYear(), cooked.getMonth(), cooked.getDate());
+  const b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((b - a) / 86400000);
+}
+
+function cookedDateLabel(dateStr) {
+  const days = daysSinceCooked(dateStr);
+  if (days <= 0) return 'Lagad idag';
+  if (days === 1) return 'Lagad igår';
+  return `Lagad för ${days} dagar sedan`;
+}
+
 // Converts a Supabase recipe row (with nested ingredients/steps) to our app format
 // ── RATINGS ──
 // 1 = 😕 inte igen, 2 = 🙂 helt ok, 3 = 😍 favorit.
@@ -2753,11 +2923,44 @@ function byName(a, b) {
   return a.name.localeCompare(b.name, 'sv', { sensitivity: 'base' });
 }
 
+// ── RECIPE SELECT COLUMNS ──
+// Ratings live in a separate table, so they're a join. If that table hasn't
+// been created yet the join makes the WHOLE query fail — which would empty
+// the recipe list even though the recipes are perfectly fine in the database.
+// ratingsAvailable is flipped off the first time we see that happen, and from
+// then on we ask for recipes without ratings rather than losing everything.
+let ratingsAvailable = true;
+const RECIPE_BASE_COLS = '*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order)';
+const RECIPE_RATING_COLS = ', recipe_ratings(user_id, rating)';
+
+function recipeCols() {
+  return RECIPE_BASE_COLS + (ratingsAvailable ? RECIPE_RATING_COLS : '');
+}
+
+// A missing table shows up as a schema/relationship error rather than a
+// network failure, so we only downgrade on that specific case.
+function looksLikeMissingRatingsTable(error) {
+  const msg = (error?.message || '').toLowerCase();
+  return msg.includes('recipe_ratings') || msg.includes('relationship') || msg.includes('schema cache');
+}
+
 async function loadRecipes() {
-  const { data, error } = await db
+  let { data, error } = await db
     .from('recipes')
-    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order), recipe_ratings(user_id, rating)')
+    .select(recipeCols())
     .eq('household_id', currentHousehold.id);
+
+  // Retry once without ratings so the app still works before the ratings
+  // SQL has been run.
+  if (error && ratingsAvailable && looksLikeMissingRatingsTable(error)) {
+    console.warn('recipe_ratings not available — loading recipes without ratings. Run supabase-ratings.sql to enable them.');
+    ratingsAvailable = false;
+    ({ data, error } = await db
+      .from('recipes')
+      .select(recipeCols())
+      .eq('household_id', currentHousehold.id));
+  }
+
   if (error) { console.error('Error loading recipes:', error.message); return; }
   // Sorted here rather than in the query — Postgres would use its own collation,
   // which doesn't match Swedish alphabetical order.
@@ -2768,7 +2971,7 @@ async function loadRecipes() {
 async function fetchOneRecipe(id) {
   const { data, error } = await db
     .from('recipes')
-    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order), recipe_ratings(user_id, rating)')
+    .select(recipeCols())
     .eq('id', id)
     .single();
   if (error || !data) return null;
@@ -2827,10 +3030,16 @@ function subscribeToRecipes() {
 }
 
 async function loadPublicRecipes() {
-  const { data, error } = await db
+  let { data, error } = await db
     .from('recipes')
-    .select('*, recipe_ingredients(id, text, sort_order), recipe_steps(id, text, sort_order), recipe_ratings(user_id, rating)')
+    .select(recipeCols())
     .eq('is_public', true);
+
+  if (error && ratingsAvailable && looksLikeMissingRatingsTable(error)) {
+    ratingsAvailable = false;
+    ({ data, error } = await db.from('recipes').select(recipeCols()).eq('is_public', true));
+  }
+
   if (error) { console.error('Error loading public recipes:', error.message); return; }
   publicRecipes = (data || []).map(mapRecipe).sort(byName);
 }
@@ -3957,6 +4166,10 @@ async function togglePlanned(recipe) {
   if (idx !== -1) recipes[idx].planned = newValue;
   showToast(newValue ? `${recipe.name} tillagd i veckan 🗓️` : `${recipe.name} borttagen från veckan`);
   renderRecipes();
+
+  // Unticking = "we cooked this" — log it as a food box. Not awaited so the
+  // toast and list update above don't wait on a second network round trip.
+  if (!newValue) logCookedBox(recipe);
 }
 
 function renderHome() {
@@ -3966,6 +4179,7 @@ function renderHome() {
   const planned = recipes.filter(r => r.planned);
   count.textContent = planned.length + (planned.length !== 1 ? ' recept planerade' : ' recept planerat');
   renderHomeGrocery();
+  renderHomeCookedLog();
   list.innerHTML = '';
   empty.style.display = planned.length === 0 ? 'block' : 'none';
   planned.forEach(recipe => {
@@ -4009,6 +4223,41 @@ function renderHomeGrocery() {
     title.textContent = `${left} ${left === 1 ? 'vara' : 'varor'} kvar att handla`;
     sub.textContent = `${total - left} av ${total} avbockade`;
   }
+}
+
+// Food box list on Home. A box turns "overdue" at 6 days since cooked —
+// just a visual flag, nothing auto-removes it. Called from renderHome()
+// and whenever cookedLog changes (log, remove, realtime update).
+function renderHomeCookedLog() {
+  const label = document.getElementById('foodbox-label');
+  const list = document.getElementById('foodbox-list');
+  list.innerHTML = '';
+  label.style.display = cookedLog.length === 0 ? 'none' : 'block';
+  if (cookedLog.length === 0) return;
+
+  const sorted = [...cookedLog].sort((a, b) => new Date(b.cooked_at) - new Date(a.cooked_at));
+  sorted.forEach(entry => {
+    const overdue = daysSinceCooked(entry.cooked_at) >= 6;
+    const el = document.createElement('div');
+    el.className = 'recipe-card foodbox-card' + (overdue ? ' overdue' : '');
+    const thumb = entry.image_url
+      ? `<img class="recipe-card-img" src="${entry.image_url}" alt="${entry.recipe_name}">`
+      : `<div class="recipe-emoji">${entry.emoji || '🍽'}</div>`;
+    el.innerHTML = `
+      ${thumb}
+      <div class="recipe-info">
+        <div class="recipe-name">${entry.recipe_name}</div>
+        <div class="recipe-meta">${cookedDateLabel(entry.cooked_at)}</div>
+      </div>
+      ${overdue ? '<div class="foodbox-overdue-badge">Töm nu 🗑️</div>' : ''}
+      <button class="foodbox-remove" title="Ta bort matlåda">✕</button>
+    `;
+    el.querySelector('.foodbox-remove').addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeCookedLog(entry.id);
+    });
+    list.appendChild(el);
+  });
 }
 
 document.getElementById('home-grocery-card').addEventListener('click', () => switchTab('grocery'));
@@ -4162,8 +4411,42 @@ function headingLabel(text) {
 }
 
 // ── RECIPE DETAIL ──
+// ── REMEMBERING AN OPEN RECIPE ──
+// Alongside the remembered tab, we store which recipe is open so a reload
+// puts you back on that recipe rather than on the list.
+//
+// Only your household's recipes are remembered. Public ones from Utforska
+// live in a separate list that isn't loaded at startup, so restoring one
+// would mean an extra fetch for a rare case.
+const OPEN_RECIPE_KEY = 'mitt-kok-open-recipe';
+
+function rememberOpenRecipe(id) {
+  try {
+    if (id) localStorage.setItem(OPEN_RECIPE_KEY, id);
+    else localStorage.removeItem(OPEN_RECIPE_KEY);
+  } catch (e) {}
+}
+
+// Called once after recipes have loaded. If the stored recipe is gone —
+// deleted on another phone, or it was a public one — we simply clear it and
+// stay on the list rather than showing an error.
+function restoreOpenRecipe() {
+  let id = null;
+  try { id = localStorage.getItem(OPEN_RECIPE_KEY); } catch (e) {}
+  if (!id) return;
+
+  const recipe = recipes.find(r => r.id === id);
+  if (recipe) openRecipeDetail(recipe);
+  else rememberOpenRecipe(null);
+}
+
 function openRecipeDetail(recipe) {
+  // Guard against a missing recipe — e.g. one deleted on another phone
+  // between the list being drawn and the card being tapped.
+  if (!recipe) return;
   currentRecipe = recipe;
+  // Only remember recipes we can find again at startup.
+  rememberOpenRecipe(recipe.household_id === currentHousehold?.id ? recipe.id : null);
   const heroEl = document.getElementById('detail-emoji');
   const detailModal = document.getElementById('detail-modal');
   if (recipe.image_url) {
@@ -4182,7 +4465,9 @@ function openRecipeDetail(recipe) {
   // Hidden for other households' public recipes — you can only rate your own.
   const ratingRow = document.querySelector('#detail-modal .rating-row');
   const othersEl = document.getElementById('detail-rating-others');
-  const ownRecipe = recipe.household_id === currentHousehold?.id;
+  // Also hidden if the ratings table isn't set up yet, so tapping a face
+  // can't fail with an error.
+  const ownRecipe = recipe.household_id === currentHousehold?.id && ratingsAvailable;
   ratingRow.style.display = ownRecipe ? '' : 'none';
   othersEl.style.display = ownRecipe ? '' : 'none';
 
@@ -4247,8 +4532,18 @@ function openRecipeDetail(recipe) {
   document.getElementById('detail-modal').classList.add('open');
 }
 
-document.getElementById('detail-back').addEventListener('click', () => {
+// Single place that closes the recipe view, so every route out of it —
+// back arrow, swipe-back, Escape, delete, "add to grocery list", cook —
+// also forgets the remembered recipe. Previously each of those called
+// classList.remove('open') directly, which would have meant five chances
+// to forget one.
+function closeRecipeDetail() {
   document.getElementById('detail-modal').classList.remove('open');
+  rememberOpenRecipe(null);
+}
+
+document.getElementById('detail-back').addEventListener('click', () => {
+  closeRecipeDetail();
 });
 
 function openDetailMenu() {
@@ -4307,7 +4602,7 @@ document.getElementById('detail-delete-btn').addEventListener('click', async () 
     } else {
       recipes = recipes.filter(r => r.id !== currentRecipe.id);
       renderRecipes();
-      document.getElementById('detail-modal').classList.remove('open');
+      closeRecipeDetail();
       showToast('Receptet är borttaget 🗑');
     }
   }
@@ -4344,7 +4639,7 @@ document.getElementById('detail-save-btn').addEventListener('click', async () =>
   });
   if (newId) {
     showToast('Recept sparat i ditt hushåll! 🎉');
-    document.getElementById('detail-modal').classList.remove('open');
+    closeRecipeDetail();
     activeFilter = 'all';
     document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === 'all'));
     renderRecipes();
@@ -4413,7 +4708,7 @@ document.getElementById('ingredient-add-btn').addEventListener('click', async ()
   } else {
     showToast(`${rows.length} ingredienser tillagda i inköpslistan 🛒`);
     document.getElementById('ingredient-modal').classList.remove('open');
-    document.getElementById('detail-modal').classList.remove('open');
+    closeRecipeDetail();
     switchTab('grocery');
   }
 });
@@ -4768,7 +5063,7 @@ document.getElementById('cooking-next').addEventListener('click', () => {
 function showCookingRatePrompt(recipe) {
   const wrap = document.getElementById('cooking-rate-prompt');
   const picker = document.getElementById('cooking-rating');
-  const ownRecipe = recipe.household_id === currentHousehold?.id;
+  const ownRecipe = recipe.household_id === currentHousehold?.id && ratingsAvailable;
 
   wrap.style.display = ownRecipe ? 'flex' : 'none';
   if (!ownRecipe) return;
@@ -4913,7 +5208,11 @@ async function checkHousehold() {
       subscribeToGrocery();
       await loadRecipes();
       subscribeToRecipes();
+      await loadCookedLog();
+      subscribeToCookedLog();
       startBackgroundRefresh();
+      // After recipes exist, so the remembered one can actually be found.
+      restoreOpenRecipe();
       return;
     }
   }
@@ -5118,11 +5417,13 @@ document.getElementById('account-signout').addEventListener('click', async () =>
   await db.auth.signOut();
   if (groceryChannel) { groceryChannel.unsubscribe(); groceryChannel = null; }
   if (recipesChannel) { recipesChannel.unsubscribe(); recipesChannel = null; }
+  if (cookedLogChannel) { cookedLogChannel.unsubscribe(); cookedLogChannel = null; }
   currentUser = null;
   currentHousehold = null;
   currentGroceryListId = null;
   groceryItems = [];
   recipes = [];
+  cookedLog = [];
   document.getElementById('account-panel').classList.remove('open');
   showAuthScreen();
 });
@@ -5162,7 +5463,7 @@ window.addEventListener('popstate', () => {
     { id: 'ingredient-modal',    close: () => document.getElementById('ingredient-modal').classList.remove('open') },
     { id: 'confirm-product-modal', close: closeConfirmModal },
     { id: 'add-modal',           close: () => { document.getElementById('add-modal').classList.remove('open'); resetAddModal(); } },
-    { id: 'detail-modal',        close: () => document.getElementById('detail-modal').classList.remove('open') },
+    { id: 'detail-modal',        close: () => closeRecipeDetail() },
     { id: 'account-panel',       close: () => document.getElementById('account-panel').classList.remove('open') },
   ];
   for (const { id, close } of modals) {
