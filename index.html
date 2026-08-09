@@ -1914,6 +1914,45 @@
   .account-row-label { font-size: 0.78rem; color: var(--gray-4); margin-bottom: 3px; }
   .account-row-value { font-size: 0.92rem; font-weight: 600; color: var(--black); }
   .account-invite-code { font-family: monospace; font-size: 1.3rem; font-weight: 700; color: var(--orange); letter-spacing: 0.15em; cursor: pointer; }
+
+  /* ── ADMIN ── */
+  .admin-section { margin-top: 24px; }
+  .admin-stats {
+    background: var(--gray-1);
+    border-radius: var(--radius-md);
+    padding: 6px 14px;
+    margin-bottom: 10px;
+  }
+  .admin-stat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--gray-2);
+  }
+  .admin-stat:last-child { border-bottom: none; }
+  .admin-stat-label { font-size: 0.82rem; color: var(--gray-4); }
+  .admin-stat-value {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--black);
+  }
+  .admin-stat-loading { padding: 12px 0; font-size: 0.82rem; color: var(--gray-3); }
+  .admin-refresh {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1.5px dashed var(--gray-2);
+    border-radius: var(--radius-sm);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gray-4);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .admin-refresh:hover { border-color: var(--orange-mid); color: var(--orange); }
   .account-signout {
     width: 100%; padding: 14px;
     background: var(--gray-1); border: none;
@@ -2142,6 +2181,14 @@
         <div class="account-invite-code" id="account-invite-code">——</div>
       </div>
     </div>
+    <!-- Admin only. Hidden by default and only revealed by checkAdminStatus();
+         the database refuses these calls for everyone else regardless. -->
+    <div class="admin-section" id="admin-section" style="display:none;">
+      <div class="avatar-section-label">Admin · statistik</div>
+      <div class="admin-stats" id="admin-stats"></div>
+      <button class="admin-refresh" id="admin-refresh" type="button">Uppdatera siffror</button>
+    </div>
+
     <button class="account-signout" id="account-signout">Logga ut</button>
     <div class="account-version" id="account-version"></div>
   </div>
@@ -2407,6 +2454,11 @@
     <button class="detail-menu-item" id="detail-public-btn">🔒 Privat</button>
     <button class="detail-menu-item" id="detail-save-btn">💾 Spara recept</button>
     <button class="detail-menu-item detail-menu-danger" id="detail-delete-btn">🗑 Ta bort</button>
+    <!-- Admin moderation. Only ever shown for PUBLIC recipes belonging to
+         another household — never for private ones, which an admin can't
+         reach anyway. -->
+    <button class="detail-menu-item" id="detail-admin-unpublish-btn">🛡 Avpublicera</button>
+    <button class="detail-menu-item detail-menu-danger" id="detail-admin-delete-btn">🛡 Ta bort som admin</button>
   </div>
 </div>
 
@@ -2521,6 +2573,10 @@ db.from('households').select('count', { count: 'exact', head: true })
   });
 
 // ── STATE ──
+// isAppAdmin only controls what the UI offers. It is NOT security — the
+// real rules live in the RLS policies in supabase-admin.sql. Anyone can
+// flip this flag in dev tools; the database will still refuse them.
+let isAppAdmin = false;
 let groceryItems = [];
 let recipes = [];
 let cookedLog = [];
@@ -2565,7 +2621,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.13.0';
+const APP_VERSION = '2.14.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2892,6 +2948,57 @@ async function logCookedBox(recipe) {
     renderHomeCookedLog();
   }
 }
+
+// ── ADMIN ──
+// Reads your own row in app_admins. The table's RLS only lets you see
+// yourself, so this can't be used to discover who else is an admin.
+// Fails closed: any error (including the table not existing yet) leaves
+// isAppAdmin false rather than accidentally granting the UI.
+async function checkAdminStatus() {
+  isAppAdmin = false;
+  if (!currentUser) return;
+  const { data, error } = await db
+    .from('app_admins')
+    .select('user_id')
+    .eq('user_id', currentUser.id)
+    .maybeSingle();
+  if (error) {
+    console.warn('Admin check skipped:', error.message);
+    return;
+  }
+  isAppAdmin = !!data;
+  document.getElementById('admin-section').style.display = isAppAdmin ? 'block' : 'none';
+  if (isAppAdmin) loadAdminStats();
+}
+
+// Counts only — see the comment on admin_stats() in supabase-admin.sql.
+async function loadAdminStats() {
+  const wrap = document.getElementById('admin-stats');
+  wrap.innerHTML = '<div class="admin-stat-loading">Laddar...</div>';
+  const { data, error } = await db.rpc('admin_stats');
+  if (error) {
+    wrap.innerHTML = '<div class="admin-stat-loading">Kunde inte ladda statistik</div>';
+    console.warn('admin_stats failed:', error.message);
+    return;
+  }
+  const rows = [
+    ['Användare', data.users],
+    ['Nya senaste 7 dagarna', data.new_users_7d],
+    ['Hushåll', data.households],
+    ['Recept totalt', data.recipes],
+    ['Publika recept', data.public_recipes],
+    ['Matlådor', data.food_boxes],
+    ['Varor i inköpslistor', data.grocery_items]
+  ];
+  wrap.innerHTML = rows.map(([label, value]) => `
+    <div class="admin-stat">
+      <span class="admin-stat-label">${label}</span>
+      <span class="admin-stat-value">${value ?? '—'}</span>
+    </div>
+  `).join('');
+}
+
+document.getElementById('admin-refresh').addEventListener('click', loadAdminStats);
 
 // ── ADD A FOOD BOX BY HAND ──
 // Same cooked_log row as a recipe-based box, just with recipe_id left null
@@ -4707,14 +4814,20 @@ function openRecipeDetail(recipe) {
   });
   const isOwnRecipe = recipe.created_by === currentUser?.id;
   const isFromOtherHousehold = recipe.household_id !== currentHousehold?.id;
+  // Moderation only applies to someone else's PUBLIC recipe. Your own
+  // recipes use the normal owner controls above, not the admin ones.
+  const canModerate = isAppAdmin && isFromOtherHousehold && recipe.is_public;
 
   // Show/hide overflow menu items based on recipe ownership
-  document.getElementById('detail-edit-btn').style.display = isOwnRecipe ? '' : 'none';
+  document.getElementById('detail-edit-btn').style.display = (isOwnRecipe || canModerate) ? '' : 'none';
   document.getElementById('detail-delete-btn').style.display = isOwnRecipe ? '' : 'none';
   document.getElementById('detail-delete-btn').textContent = '🗑 Ta bort';
   document.getElementById('detail-public-btn').style.display = isOwnRecipe ? '' : 'none';
   document.getElementById('detail-public-btn').textContent = recipe.is_public ? '🌍 Publik' : '🔒 Privat';
   document.getElementById('detail-save-btn').style.display = isFromOtherHousehold ? '' : 'none';
+  document.getElementById('detail-admin-unpublish-btn').style.display = canModerate ? '' : 'none';
+  document.getElementById('detail-admin-delete-btn').style.display = canModerate ? '' : 'none';
+  document.getElementById('detail-admin-delete-btn').textContent = '🛡 Ta bort som admin';
 
   // Only show the ··· menu button if there's anything in the menu
   const hasMenu = isOwnRecipe || isFromOtherHousehold;
@@ -4813,6 +4926,72 @@ document.getElementById('detail-public-btn').addEventListener('click', async () 
     showToast(newValue ? 'Receptet är nu publikt 🌍' : 'Receptet är nu privat 🔒');
     renderRecipes();
   }
+});
+
+// ── ADMIN MODERATION ──
+// Unpublish: the recipe stays intact for the family that wrote it, it just
+// leaves Utforska. Reversible by them, and the least destructive option —
+// worth reaching for before the delete below.
+document.getElementById('detail-admin-unpublish-btn').addEventListener('click', async () => {
+  if (!currentRecipe) return;
+  const btn = document.getElementById('detail-admin-unpublish-btn');
+  btn.disabled = true;
+  const { error } = await db.from('recipes').update({ is_public: false }).eq('id', currentRecipe.id);
+  btn.disabled = false;
+  if (error) { showToast('Kunde inte avpublicera 😕'); console.warn(error.message); return; }
+  currentRecipe.is_public = false;
+  publicRecipes = publicRecipes.filter(r => r.id !== currentRecipe.id);
+  closeDetailMenu();
+  closeRecipeDetail();
+  renderRecipes();
+  showToast('Receptet är avpublicerat 🛡');
+});
+
+// Permanent delete of someone else's recipe. Two taps, same pattern as the
+// owner delete — but this one destroys another family's data, so the
+// confirm copy says so out loud.
+let adminDeletePending = false;
+let adminDeleteTimer = null;
+
+document.getElementById('detail-admin-delete-btn').addEventListener('click', async () => {
+  if (!currentRecipe) return;
+  const btn = document.getElementById('detail-admin-delete-btn');
+
+  if (!adminDeletePending) {
+    adminDeletePending = true;
+    btn.textContent = '⚠️ Radera permanent?';
+    btn.style.background = '#e53935';
+    btn.style.color = '#fff';
+    adminDeleteTimer = setTimeout(() => {
+      adminDeletePending = false;
+      btn.textContent = '🛡 Ta bort som admin';
+      btn.style.background = '';
+      btn.style.color = '#e53935';
+    }, 3000);
+    return;
+  }
+
+  clearTimeout(adminDeleteTimer);
+  adminDeletePending = false;
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  // Children first — the foreign keys require this order.
+  await db.from('recipe_ingredients').delete().eq('recipe_id', currentRecipe.id);
+  await db.from('recipe_steps').delete().eq('recipe_id', currentRecipe.id);
+  const { error } = await db.from('recipes').delete().eq('id', currentRecipe.id);
+
+  btn.textContent = '🛡 Ta bort som admin';
+  btn.style.background = '';
+  btn.style.color = '#e53935';
+  btn.disabled = false;
+
+  if (error) { showToast('Kunde inte ta bort 😕'); console.warn(error.message); return; }
+  publicRecipes = publicRecipes.filter(r => r.id !== currentRecipe.id);
+  closeDetailMenu();
+  closeRecipeDetail();
+  renderRecipes();
+  showToast('Receptet är borttaget 🛡');
 });
 
 // Copy a public recipe from another household into your own
@@ -5106,6 +5285,8 @@ document.getElementById('modal-save-btn').addEventListener('click', async () => 
     } else if (pickerMode === 'emoji') {
       recipeData.image_url = null; // switched back to emoji, clear image
     }
+    // Captured before resetAddModal() clears it below.
+    const editedId = editingRecipeId;
     const result = await updateRecipeInDB(editingRecipeId, recipeData);
     if (result?.error) {
       showToast('Fel: ' + result.error);
@@ -5115,6 +5296,11 @@ document.getElementById('modal-save-btn').addEventListener('click', async () => 
       document.getElementById('add-modal').classList.remove('open');
       resetAddModal();
       showToast('Recept uppdaterat! ✏️');
+      // An admin editing someone else's public recipe: it isn't in our
+      // `recipes` array, and the realtime channel is filtered to our own
+      // household, so no event will arrive. Refetch so Utforska doesn't
+      // keep showing the version we just replaced.
+      if (isAppAdmin && publicRecipes.some(r => r.id === editedId)) loadPublicRecipes();
     } else {
       showToast('Kunde inte uppdatera receptet 😕');
       btn.textContent = originalText;
@@ -5402,6 +5588,7 @@ async function checkHousehold() {
       subscribeToRecipes();
       await loadCookedLog();
       subscribeToCookedLog();
+      checkAdminStatus();
       startBackgroundRefresh();
       // After recipes exist, so the remembered one can actually be found.
       restoreOpenRecipe();
@@ -5610,6 +5797,8 @@ document.getElementById('account-signout').addEventListener('click', async () =>
   if (groceryChannel) { groceryChannel.unsubscribe(); groceryChannel = null; }
   if (recipesChannel) { recipesChannel.unsubscribe(); recipesChannel = null; }
   if (cookedLogChannel) { cookedLogChannel.unsubscribe(); cookedLogChannel = null; }
+  isAppAdmin = false;
+  document.getElementById('admin-section').style.display = 'none';
   currentUser = null;
   currentHousehold = null;
   currentGroceryListId = null;
