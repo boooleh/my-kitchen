@@ -2621,7 +2621,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.14.0';
+const APP_VERSION = '2.14.1';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -3193,6 +3193,14 @@ function ratingAverage(ratings) {
   return ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
 }
 
+// '— min' was the old placeholder for "no time given". Treat it, and a bare
+// dash, as empty so nothing is shown at all.
+function cleanMeta(value) {
+  const meta = (value || '').trim();
+  if (meta === '— min' || meta === '—' || meta === '-' || meta === '- min') return '';
+  return meta;
+}
+
 function mapRecipe(row) {
   const ratings = row.recipe_ratings || [];
   return {
@@ -3200,7 +3208,10 @@ function mapRecipe(row) {
     household_id: row.household_id,
     name: row.name,
     emoji: row.emoji || '🍽',
-    meta: row.meta || '',
+    // Recipes saved before this was fixed still have the literal '— min'
+    // stored. Cleaning it here means they render blank too, without needing
+    // to rewrite rows in the database.
+    meta: cleanMeta(row.meta),
     tag: row.tag || '',
     created_by: row.created_by,
     is_public: row.is_public || false,
@@ -4493,7 +4504,7 @@ function renderHome() {
       ${thumb}
       <div class="recipe-info">
         <div class="recipe-name">${recipe.name}</div>
-        <div class="recipe-meta">${recipe.meta}</div>
+        ${recipe.meta ? `<div class="recipe-meta">${recipe.meta}</div>` : ''}
       </div>
       <button class="recipe-plan-btn active" title="Ta bort från veckan">✓</button>
     `;
@@ -4592,7 +4603,7 @@ function renderRecipes() {
         ${thumb}
         <div class="recipe-info">
           <div class="recipe-name">${recipe.name}</div>
-          <div class="recipe-meta">${recipe.meta}</div>
+          ${recipe.meta ? `<div class="recipe-meta">${recipe.meta}</div>` : ''}
         </div>
         <div class="recipe-badge" style="background:var(--orange-light);color:var(--orange);">🌍 ${recipe.tag}</div>
       `;
@@ -4646,7 +4657,7 @@ function renderRecipes() {
       ${thumb}
       <div class="recipe-info">
         <div class="recipe-name">${recipe.name}</div>
-        <div class="recipe-meta">${recipe.meta}</div>
+        ${recipe.meta ? `<div class="recipe-meta">${recipe.meta}</div>` : ''}
       </div>
       ${ratingBadgeHtml(recipe)}
       <div class="recipe-badge">${recipe.tag}${recipe.is_public ? ' 🌍' : ''}</div>
@@ -4758,7 +4769,10 @@ function openRecipeDetail(recipe) {
     detailModal.classList.remove('has-image');
   }
   document.getElementById('detail-name').textContent = recipe.name;
-  document.getElementById('detail-meta').innerHTML = `<span>⏱ ${recipe.meta}</span><span>🏷 ${recipe.tag}</span>`;
+  // Skip the clock entirely when no time was given — an empty ⏱ reads as
+  // missing data rather than "not relevant".
+  document.getElementById('detail-meta').innerHTML =
+    `${recipe.meta ? `<span>⏱ ${recipe.meta}</span>` : ''}<span>🏷 ${recipe.tag}</span>`;
 
   // ── Rating ──
   // Hidden for other households' public recipes — you can only rate your own.
@@ -5270,7 +5284,9 @@ document.getElementById('modal-save-btn').addEventListener('click', async () => 
     name,
     emoji: pickerMode === 'emoji' ? selectedEmoji : '🍽',
     image_url: null, // will be set after upload if photo mode
-    meta: document.getElementById('recipe-meta-input').value.trim() || '— min',
+    // Empty stays empty. Previously this fell back to '— min', which showed
+    // a dash under every recipe that simply had no time entered.
+    meta: document.getElementById('recipe-meta-input').value.trim(),
     tag: document.getElementById('recipe-tag-input').value.trim() || 'Other',
     ingredients: document.getElementById('recipe-ingredients-input').value.trim().split('\n').filter(Boolean),
     steps: document.getElementById('recipe-steps-input').value.trim().split('\n').filter(Boolean),
