@@ -895,6 +895,41 @@
   }
   .foodbox-badge.overdue { background: var(--orange); color: var(--white); }
 
+  /* Dashed rather than filled, so it reads as an affordance to add rather
+     than as another food box in the list. */
+  .foodbox-add-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: calc(100% - 48px);
+    margin: 8px 24px 0;
+    padding: 12px 14px;
+    background: transparent;
+    border: 1.5px dashed var(--gray-2);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-4);
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .foodbox-add-row:hover {
+    border-color: var(--orange-mid);
+    color: var(--orange);
+    background: var(--orange-light);
+  }
+  .foodbox-add-icon {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--gray-1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .foodbox-add-row:hover .foodbox-add-icon { background: var(--white); }
+
   .home-grocery-card {
     display: flex;
     align-items: center;
@@ -2162,8 +2197,14 @@
 
       <!-- Food boxes: logged automatically when a recipe is unticked from
            "Planerat" above. Hidden entirely when there are none. -->
-      <div class="section-label foodbox-label-spacing" id="foodbox-label" style="display:none;">Matlådor</div>
+      <div class="section-label foodbox-label-spacing" id="foodbox-label">Matlådor</div>
       <div class="recipe-list" id="foodbox-list"></div>
+      <!-- Always visible, so a food box with no recipe behind it is still
+           one tap away even when the list is empty. -->
+      <button class="foodbox-add-row" id="foodbox-add-row" type="button">
+        <span class="foodbox-add-icon">+</span>
+        <span>Lägg till matlåda</span>
+      </button>
     </div>
   </div>
 
@@ -2245,6 +2286,26 @@
 <div class="update-banner" id="update-banner">
   <span class="update-banner-text">Ny version tillgänglig</span>
   <button class="update-banner-btn" id="update-reload" type="button">Ladda om</button>
+</div>
+
+<!-- ADD FOOD BOX MANUALLY MODAL -->
+<!-- For food cooked without a saved recipe. Name only — the emoji defaults
+     to 🍽 so this stays a two-tap action. -->
+<div class="modal-overlay" id="foodbox-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Lägg till matlåda</div>
+    <label class="modal-label">Vad lagade ni?</label>
+    <input
+      class="modal-input"
+      id="foodbox-name-input"
+      type="text"
+      placeholder="t.ex. Rester från fredagsmys"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="sentences" />
+    <button class="modal-save-btn" id="foodbox-save-btn" type="button">Lägg till</button>
+  </div>
 </div>
 
 <!-- CONFIRM / EDIT PRODUCT MODAL (reused for both "after scan" and "edit row") -->
@@ -2504,7 +2565,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.12.0';
+const APP_VERSION = '2.13.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -2832,6 +2893,60 @@ async function logCookedBox(recipe) {
   }
 }
 
+// ── ADD A FOOD BOX BY HAND ──
+// Same cooked_log row as a recipe-based box, just with recipe_id left null
+// and a default emoji — so it sorts, ages, and swipes exactly the same.
+function openFoodboxModal() {
+  const input = document.getElementById('foodbox-name-input');
+  input.value = '';
+  pushModalHistory();
+  document.getElementById('foodbox-modal').classList.add('open');
+  setTimeout(() => input.focus(), 350);
+}
+
+function closeFoodboxModal() {
+  document.getElementById('foodbox-modal').classList.remove('open');
+}
+
+async function saveManualFoodbox() {
+  const input = document.getElementById('foodbox-name-input');
+  const name = input.value.trim();
+  if (!name) { input.focus(); return; }
+
+  if (!cookedLogAvailable) { showToast('Matlådor är inte aktiverade än 😕'); return; }
+
+  closeFoodboxModal();
+
+  const { data, error } = await db.from('cooked_log').insert({
+    household_id: currentHousehold.id,
+    recipe_id: null,
+    recipe_name: name,
+    emoji: '🍽',
+    image_url: null,
+    created_by: currentUser?.id || null
+  }).select().single();
+
+  if (error) {
+    console.warn('Could not add food box:', error.message);
+    showToast('Kunde inte lägga till 😕');
+    return;
+  }
+  if (!cookedLog.find(e => e.id === data.id)) {
+    cookedLog.unshift(mapCookedLog(data));
+    renderHomeCookedLog();
+  }
+  showToast(`${name} tillagd 🍱`);
+}
+
+document.getElementById('foodbox-add-row').addEventListener('click', openFoodboxModal);
+document.getElementById('foodbox-save-btn').addEventListener('click', saveManualFoodbox);
+document.getElementById('foodbox-name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveManualFoodbox();
+});
+document.getElementById('foodbox-modal').addEventListener('click', e => {
+  if (e.target.id === 'foodbox-modal') closeFoodboxModal();
+});
+
 // Swipe-to-delete for a food box row — same gesture, threshold, and red
 // reveal as the grocery list's attachGroceryRowGestures, minus the
 // long-press edit reveal (a food box has nothing to edit, only remove).
@@ -2886,11 +3001,7 @@ function attachFoodboxSwipe(el, entry) {
       cookedLog = cookedLog.filter(e => e.id !== entry.id);
       db.from('cooked_log').delete().eq('id', entry.id)
         .then(({ error }) => { if (error) console.error('Delete failed:', error.message); });
-      setTimeout(() => {
-        el.remove();
-        const label = document.getElementById('foodbox-label');
-        if (label) label.style.display = cookedLog.length === 0 ? 'none' : 'block';
-      }, 260);
+      setTimeout(() => el.remove(), 260);
     } else {
       el.style.transform = '';
       const reveal = el.querySelector('.delete-reveal');
@@ -4313,10 +4424,8 @@ function renderHomeGrocery() {
 // Called from renderHome() and whenever cookedLog changes (log, remove,
 // realtime update).
 function renderHomeCookedLog() {
-  const label = document.getElementById('foodbox-label');
   const list = document.getElementById('foodbox-list');
   list.innerHTML = '';
-  label.style.display = cookedLog.length === 0 ? 'none' : 'block';
   if (cookedLog.length === 0) return;
 
   const sorted = [...cookedLog].sort((a, b) => new Date(b.cooked_at) - new Date(a.cooked_at));
@@ -5544,6 +5653,7 @@ window.addEventListener('popstate', () => {
     { id: 'cooking-modal',       close: closeCookingMode },
     { id: 'detail-menu-overlay', close: closeDetailMenu },
     { id: 'ingredient-modal',    close: () => document.getElementById('ingredient-modal').classList.remove('open') },
+    { id: 'foodbox-modal',       close: closeFoodboxModal },
     { id: 'confirm-product-modal', close: closeConfirmModal },
     { id: 'add-modal',           close: () => { document.getElementById('add-modal').classList.remove('open'); resetAddModal(); } },
     { id: 'detail-modal',        close: () => closeRecipeDetail() },
