@@ -1333,6 +1333,50 @@
   }
   .detail-action-primary:hover { opacity: 0.9; }
 
+  /* ── ADD / EDIT RECIPE PAGE ──
+     Used to be a bottom sheet (.modal-overlay). It is now a full screen of
+     its own, built on the same shape as .detail-modal so the two feel like
+     the same app: slides in from the right, round back button top-left, and
+     the primary action pinned to the bottom where a thumb reaches it.
+     z-index sits above .detail-modal (200) because Redigera opens from it. */
+  .recipe-page {
+    position: fixed;
+    inset: 0;
+    max-width: var(--shell-max);
+    margin: 0 auto;
+    background: var(--white);
+    z-index: 250;
+    display: none;
+    flex-direction: column;
+    animation: slideInRight 0.35s var(--ease-out);
+  }
+  .recipe-page.open { display: flex; }
+
+  /* Overrides the bottom-sheet .modal-title this element still carries, so
+     the JS that swaps "Lägg till recept" / "Redigera recept" keeps working. */
+  .recipe-page .modal-title {
+    margin-bottom: 0;
+    flex: 1;
+    text-align: center;
+  }
+  /* Balances the 40px back button so the title sits optically centred. */
+  .recipe-page-spacer { width: 40px; flex-shrink: 0; }
+
+  .recipe-page-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 24px 24px;
+  }
+
+  .recipe-page-actions {
+    padding: 16px 24px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--gray-2);
+    flex-shrink: 0;
+    background: var(--white);
+  }
+  .recipe-page-actions .modal-save-btn { margin-top: 0; }
+
   /* ── OVERFLOW MENU ── */
   .detail-menu-overlay {
     position: fixed;
@@ -2377,10 +2421,13 @@
 </div>
 
 <!-- ADD RECIPE MODAL -->
-<div class="modal-overlay" id="add-modal">
-  <div class="modal">
-    <div class="modal-handle"></div>
+<div class="recipe-page" id="add-modal">
+  <div class="detail-top">
+    <button class="detail-back" id="recipe-page-back" type="button">←</button>
     <div class="modal-title">Lägg till recept</div>
+    <span class="recipe-page-spacer"></span>
+  </div>
+  <div class="recipe-page-scroll">
 
     <form class="manual-area" id="manual-area" autocomplete="off" onsubmit="return false;">
       <label class="modal-label">Receptnamn</label>
@@ -2412,6 +2459,8 @@
       <textarea class="modal-textarea" id="recipe-steps-input" placeholder="Koka pasta al dente&#10;Blanda ägg och ost&#10;Blanda allt utanför plattan" autocomplete="new-password" autocorrect="off" autocapitalize="sentences" spellcheck="false"></textarea>
     </form>
 
+  </div>
+  <div class="recipe-page-actions">
     <button class="modal-save-btn" id="modal-save-btn" type="button">Spara recept</button>
   </div>
 </div>
@@ -2621,7 +2670,7 @@ function loadZxing() {
 // On every deploy, bump APP_VERSION here AND the "version" field in
 // version.json. When the two don't match, show the banner so users
 // can reload into the new code. Skip-fails silently when offline.
-const APP_VERSION = '2.14.1';
+const APP_VERSION = '2.15.0';
 
 // Show the running version as a small footer in the account menu.
 document.getElementById('account-version').textContent = `Version ${APP_VERSION}`;
@@ -3013,6 +3062,7 @@ function openFoodboxModal() {
 
 function closeFoodboxModal() {
   document.getElementById('foodbox-modal').classList.remove('open');
+  popModalHistory();
 }
 
 async function saveManualFoodbox() {
@@ -3373,15 +3423,21 @@ async function addRecipeToDB(recipeData) {
     .single();
   if (error) { console.error('Error saving recipe:', error.message); return { error: error.message }; }
 
+  // Ingredients and steps are separate tables, so they're separate calls that
+  // can fail on their own. These used to be fired off unchecked — if one
+  // failed you still got "Recept sparat! 🎉" and only found the missing
+  // ingredients later.
   if (recipeData.ingredients.length > 0) {
-    await db.from('recipe_ingredients').insert(
+    const { error: ingErr } = await db.from('recipe_ingredients').insert(
       recipeData.ingredients.map((text, i) => ({ recipe_id: newRecipe.id, text, sort_order: i }))
     );
+    if (ingErr) { console.error('Error saving ingredients:', ingErr.message); return { error: 'Ingredienserna kunde inte sparas' }; }
   }
   if (recipeData.steps.length > 0) {
-    await db.from('recipe_steps').insert(
+    const { error: stepErr } = await db.from('recipe_steps').insert(
       recipeData.steps.map((text, i) => ({ recipe_id: newRecipe.id, text, sort_order: i }))
     );
+    if (stepErr) { console.error('Error saving steps:', stepErr.message); return { error: 'Stegen kunde inte sparas' }; }
   }
   return newRecipe.id;
 }
@@ -3392,15 +3448,20 @@ async function updateRecipeInDB(id, recipeData) {
   await db.from('recipe_ingredients').delete().eq('recipe_id', id);
   await db.from('recipe_steps').delete().eq('recipe_id', id);
 
+  // Checked, not fire-and-forget: the old rows are already deleted at this
+  // point, so a silent failure here would empty the recipe while still
+  // reporting "Recept uppdaterat!".
   if (recipeData.ingredients.length > 0) {
-    await db.from('recipe_ingredients').insert(
+    const { error: ingErr } = await db.from('recipe_ingredients').insert(
       recipeData.ingredients.map((text, i) => ({ recipe_id: id, text, sort_order: i }))
     );
+    if (ingErr) { console.error('Error updating ingredients:', ingErr.message); return { error: 'Ingredienserna kunde inte sparas' }; }
   }
   if (recipeData.steps.length > 0) {
-    await db.from('recipe_steps').insert(
+    const { error: stepErr } = await db.from('recipe_steps').insert(
       recipeData.steps.map((text, i) => ({ recipe_id: id, text, sort_order: i }))
     );
+    if (stepErr) { console.error('Error updating steps:', stepErr.message); return { error: 'Stegen kunde inte sparas' }; }
   }
 
   const updatePayload = {
@@ -4233,6 +4294,7 @@ function openGroceryEditModal(item) {
 
 function closeConfirmModal() {
   document.getElementById('confirm-product-modal').classList.remove('open');
+  popModalHistory();
   pendingBarcode = null;
   editingItemId = null;
   editingItemBarcode = null;
@@ -4858,6 +4920,7 @@ function openRecipeDetail(recipe) {
 // to forget one.
 function closeRecipeDetail() {
   document.getElementById('detail-modal').classList.remove('open');
+  popModalHistory();
   rememberOpenRecipe(null);
 }
 
@@ -4871,6 +4934,7 @@ function openDetailMenu() {
 }
 function closeDetailMenu() {
   document.getElementById('detail-menu-overlay').classList.remove('open');
+  popModalHistory();
 }
 
 document.getElementById('detail-menu-btn').addEventListener('click', openDetailMenu);
@@ -5092,16 +5156,21 @@ document.getElementById('ingredient-add-btn').addEventListener('click', async ()
     showToast('Kunde inte lägga till ingredienser 😕');
   } else {
     showToast(`${rows.length} ingredienser tillagda i inköpslistan 🛒`);
-    document.getElementById('ingredient-modal').classList.remove('open');
+    closeIngredientPicker();
     closeRecipeDetail();
     switchTab('grocery');
   }
 });
 
+// Single close point, so the backdrop tap, the back gesture and the "added to
+// list" path all clean up the same way.
+function closeIngredientPicker() {
+  document.getElementById('ingredient-modal').classList.remove('open');
+  popModalHistory();
+}
+
 document.getElementById('ingredient-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('ingredient-modal')) {
-    document.getElementById('ingredient-modal').classList.remove('open');
-  }
+  if (e.target === document.getElementById('ingredient-modal')) closeIngredientPicker();
 });
 
 // ── ADD / EDIT RECIPE MODAL ──
@@ -5212,6 +5281,7 @@ function resetAddModal() {
   selectedImageFile = null;
   document.querySelector('#add-modal .modal-title').textContent = 'Lägg till recept';
   document.getElementById('modal-save-btn').textContent = 'Spara recept';
+  document.getElementById('modal-save-btn').disabled = false;
   MODAL_FIELDS.forEach(id => document.getElementById(id).value = '');
   resetPhotoArea();
   switchPickerTab('emoji');
@@ -5242,8 +5312,18 @@ function openEditModal(recipe) {
     resetPhotoArea();
   }
 
+  openRecipePage();
+}
+
+// Opening the page also re-enables Spara. It gets disabled while a save is in
+// flight, and a save that succeeded used to leave it disabled for good — which
+// is why the button appeared dead the next time you edited a recipe.
+function openRecipePage() {
+  const btn = document.getElementById('modal-save-btn');
+  btn.disabled = false;
   pushModalHistory();
   document.getElementById('add-modal').classList.add('open');
+  document.querySelector('#add-modal .recipe-page-scroll').scrollTop = 0;
   // Must run after .open — a hidden element reports scrollHeight 0.
   refreshTextareaSizes();
 }
@@ -5256,91 +5336,103 @@ document.getElementById('detail-edit-btn').addEventListener('click', () => {
 
 document.getElementById('recipe-add-btn').addEventListener('click', () => {
   resetAddModal();
-  pushModalHistory();
-  document.getElementById('add-modal').classList.add('open');
-  refreshTextareaSizes();
+  openRecipePage();
 });
 
-document.getElementById('add-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('add-modal')) {
-    resetAddModal();
-    document.getElementById('add-modal').classList.remove('open');
-  }
-});
+// Single close point for the recipe page — used by the ← button, the back
+// gesture and both save paths. Previously the page was a sheet you could
+// dismiss by tapping the backdrop, which threw away a half-typed recipe on one
+// stray tap; a full page has no backdrop, so that can't happen any more.
+function closeRecipePage() {
+  document.getElementById('add-modal').classList.remove('open');
+  popModalHistory();
+  resetAddModal();
+}
+
+document.getElementById('recipe-page-back').addEventListener('click', closeRecipePage);
 
 // Init picker on page load
 initEmojiPicker();
 
+// Saving is wrapped in try/finally so the button is ALWAYS put back, whatever
+// happens. It used to be re-enabled only on the failure branches: a successful
+// save left disabled = true forever, so the next time you opened Redigera the
+// Spara button did nothing. An unexpected throw (image upload, dropped
+// connection) left it stuck in the same way with no message at all.
 document.getElementById('modal-save-btn').addEventListener('click', async () => {
   const name = document.getElementById('recipe-name-input').value.trim();
   if (!name) { showToast('Lägg till ett receptnamn'); return; }
 
   const btn = document.getElementById('modal-save-btn');
   const originalText = btn.textContent;
+  if (btn.disabled) return; // a save is already running — ignore the double tap
   btn.textContent = '...';
   btn.disabled = true;
 
-  const recipeData = {
-    name,
-    emoji: pickerMode === 'emoji' ? selectedEmoji : '🍽',
-    image_url: null, // will be set after upload if photo mode
-    // Empty stays empty. Previously this fell back to '— min', which showed
-    // a dash under every recipe that simply had no time entered.
-    meta: document.getElementById('recipe-meta-input').value.trim(),
-    tag: document.getElementById('recipe-tag-input').value.trim() || 'Other',
-    ingredients: document.getElementById('recipe-ingredients-input').value.trim().split('\n').filter(Boolean),
-    steps: document.getElementById('recipe-steps-input').value.trim().split('\n').filter(Boolean),
-    keepExistingImage: pickerMode === 'photo' && !selectedImageFile // editing, no new file chosen
-  };
+  try {
+    const recipeData = {
+      name,
+      emoji: pickerMode === 'emoji' ? selectedEmoji : '🍽',
+      image_url: null, // will be set after upload if photo mode
+      // Empty stays empty. Previously this fell back to '— min', which showed
+      // a dash under every recipe that simply had no time entered.
+      meta: document.getElementById('recipe-meta-input').value.trim(),
+      tag: document.getElementById('recipe-tag-input').value.trim() || 'Other',
+      ingredients: document.getElementById('recipe-ingredients-input').value.trim().split('\n').filter(Boolean),
+      steps: document.getElementById('recipe-steps-input').value.trim().split('\n').filter(Boolean),
+      keepExistingImage: pickerMode === 'photo' && !selectedImageFile // editing, no new file chosen
+    };
 
-  if (editingRecipeId !== null) {
-    // If new photo selected, upload it first
-    if (pickerMode === 'photo' && selectedImageFile) {
-      const url = await uploadRecipeImage(selectedImageFile, editingRecipeId);
-      recipeData.image_url = url;
-    } else if (pickerMode === 'emoji') {
-      recipeData.image_url = null; // switched back to emoji, clear image
-    }
-    // Captured before resetAddModal() clears it below.
-    const editedId = editingRecipeId;
-    const result = await updateRecipeInDB(editingRecipeId, recipeData);
-    if (result?.error) {
-      showToast('Fel: ' + result.error);
-      btn.textContent = originalText;
-      btn.disabled = false;
-    } else if (result) {
-      document.getElementById('add-modal').classList.remove('open');
-      resetAddModal();
-      showToast('Recept uppdaterat! ✏️');
-      // An admin editing someone else's public recipe: it isn't in our
-      // `recipes` array, and the realtime channel is filtered to our own
-      // household, so no event will arrive. Refetch so Utforska doesn't
-      // keep showing the version we just replaced.
-      if (isAppAdmin && publicRecipes.some(r => r.id === editedId)) loadPublicRecipes();
-    } else {
-      showToast('Kunde inte uppdatera receptet 😕');
-      btn.textContent = originalText;
-      btn.disabled = false;
-    }
-  } else {
-    const result = await addRecipeToDB(recipeData);
-    if (result?.error) {
-      showToast('Fel: ' + result.error);
-      btn.textContent = originalText;
-      btn.disabled = false;
-    } else if (result) {
-      // If photo mode and a file was selected, upload it now that we have the recipe ID
+    if (editingRecipeId !== null) {
+      // If new photo selected, upload it first
       if (pickerMode === 'photo' && selectedImageFile) {
-        const url = await uploadRecipeImage(selectedImageFile, result);
-        if (url) await db.from('recipes').update({ image_url: url }).eq('id', result);
+        const url = await uploadRecipeImage(selectedImageFile, editingRecipeId);
+        recipeData.image_url = url;
+      } else if (pickerMode === 'emoji') {
+        recipeData.image_url = null; // switched back to emoji, clear image
       }
-      document.getElementById('add-modal').classList.remove('open');
-      resetAddModal();
-      showToast('Recept sparat! 🎉');
+      // Captured before resetAddModal() clears it below.
+      const editedId = editingRecipeId;
+      const result = await updateRecipeInDB(editingRecipeId, recipeData);
+      if (result?.error) {
+        showToast('Fel: ' + result.error);
+      } else if (result) {
+        closeRecipePage();
+        showToast('Recept uppdaterat! ✏️');
+        // An admin editing someone else's public recipe: it isn't in our
+        // `recipes` array, and the realtime channel is filtered to our own
+        // household, so no event will arrive. Refetch so Utforska doesn't
+        // keep showing the version we just replaced.
+        if (isAppAdmin && publicRecipes.some(r => r.id === editedId)) loadPublicRecipes();
+      } else {
+        showToast('Kunde inte uppdatera receptet 😕');
+      }
     } else {
-      showToast('Kunde inte spara receptet 😕');
+      const result = await addRecipeToDB(recipeData);
+      if (result?.error) {
+        showToast('Fel: ' + result.error);
+      } else if (result) {
+        // If photo mode and a file was selected, upload it now that we have the recipe ID
+        if (pickerMode === 'photo' && selectedImageFile) {
+          const url = await uploadRecipeImage(selectedImageFile, result);
+          if (url) await db.from('recipes').update({ image_url: url }).eq('id', result);
+        }
+        closeRecipePage();
+        showToast('Recept sparat! 🎉');
+      } else {
+        showToast('Kunde inte spara receptet 😕');
+      }
+    }
+  } catch (err) {
+    console.error('Save recipe failed:', err);
+    showToast('Något gick fel när receptet skulle sparas 😕');
+  } finally {
+    btn.disabled = false;
+    // Only put the label back if we're still on the page. On a successful save
+    // closeRecipePage() has already reset it to "Spara recept", and restoring
+    // originalText here would leave "Spara ändringar" showing on a new recipe.
+    if (document.getElementById('add-modal').classList.contains('open')) {
       btn.textContent = originalText;
-      btn.disabled = false;
     }
   }
 });
@@ -5478,6 +5570,7 @@ function showCookingRatePrompt(recipe) {
 
 function closeCookingMode() {
   document.getElementById('cooking-modal').classList.remove('open');
+  popModalHistory();
   screen.orientation?.unlock();
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
@@ -5795,12 +5888,15 @@ document.getElementById('nav-account').addEventListener('click', () => {
   document.getElementById('account-panel').classList.add('open');
 });
 
+function closeAccountPanel() {
+  document.getElementById('account-panel').classList.remove('open');
+  popModalHistory();
+  document.getElementById('avatar-grid-wrapper').classList.remove('open');
+  document.getElementById('avatar-toggle-btn').textContent = 'Ändra avatar ›';
+}
+
 document.getElementById('account-panel').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('account-panel')) {
-    document.getElementById('account-panel').classList.remove('open');
-    document.getElementById('avatar-grid-wrapper').classList.remove('open');
-    document.getElementById('avatar-toggle-btn').textContent = 'Ändra avatar ›';
-  }
+  if (e.target === document.getElementById('account-panel')) closeAccountPanel();
 });
 
 document.getElementById('account-invite-code').addEventListener('click', () => {
@@ -5852,23 +5948,52 @@ function pushModalHistory() {
   history.pushState({ isModal: true }, '');
 }
 
+// The other half of pushModalHistory. When an overlay is closed any way OTHER
+// than the back gesture — Spara, the ← button, tapping the backdrop — the
+// history entry it pushed on open is still sitting there. Every close used to
+// leave one behind, so after a few recipes the back gesture just silently ate
+// stale entries instead of appearing to do anything. Each close function now
+// calls this to remove its own entry.
+//
+// The guard stops a double-pop: when the close was *caused* by the back
+// gesture, popstate has already consumed the entry, so popping again would
+// eat the previous screen's entry too.
+let closingFromBackGesture = false;
+let pendingHistoryPops = 0;
+function popModalHistory() {
+  if (closingFromBackGesture) return;
+  if (!history.state?.isModal) return;
+  // history.back() is asynchronous — it fires popstate on a later tick. The
+  // counter lets that popstate identify itself as our own cleanup rather than
+  // a real back gesture, so it doesn't go on and close a second overlay.
+  pendingHistoryPops++;
+  history.back();
+}
+
 window.addEventListener('popstate', () => {
+  if (pendingHistoryPops > 0) { pendingHistoryPops--; return; }
+
   // Close the topmost open modal, in priority order
   const modals = [
     { id: 'cooking-modal',       close: closeCookingMode },
     { id: 'detail-menu-overlay', close: closeDetailMenu },
-    { id: 'ingredient-modal',    close: () => document.getElementById('ingredient-modal').classList.remove('open') },
+    { id: 'ingredient-modal',    close: closeIngredientPicker },
     { id: 'foodbox-modal',       close: closeFoodboxModal },
     { id: 'confirm-product-modal', close: closeConfirmModal },
-    { id: 'add-modal',           close: () => { document.getElementById('add-modal').classList.remove('open'); resetAddModal(); } },
-    { id: 'detail-modal',        close: () => closeRecipeDetail() },
-    { id: 'account-panel',       close: () => document.getElementById('account-panel').classList.remove('open') },
+    { id: 'add-modal',           close: closeRecipePage },
+    { id: 'detail-modal',        close: closeRecipeDetail },
+    { id: 'account-panel',       close: closeAccountPanel },
   ];
-  for (const { id, close } of modals) {
-    if (document.getElementById(id)?.classList.contains('open')) {
-      close();
-      return;
+  closingFromBackGesture = true;
+  try {
+    for (const { id, close } of modals) {
+      if (document.getElementById(id)?.classList.contains('open')) {
+        close();
+        return;
+      }
     }
+  } finally {
+    closingFromBackGesture = false;
   }
   // No modal was open — let the browser handle it normally (navigate back)
 });
