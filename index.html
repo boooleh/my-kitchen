@@ -1264,30 +1264,41 @@
     justify-content: space-between;
     flex-shrink: 0;
   }
-  .detail-back {
-    background: var(--gray-1);
-    border: none;
-    border-radius: 50%;
-    width: 40px; height: 40px;
-    font-size: 1.1rem;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.15s;
-  }
-  .detail-back:hover { background: var(--gray-2); }
+  /* These two used to hold text characters — an "←" arrow and three "·"
+     periods. Text meant the shapes came from whatever font the phone had, so
+     they looked different on iPhone and Android, and the periods sat on the
+     baseline instead of centred in the circle. They're drawn as SVG now:
+     identical everywhere, and optically centred. */
+  .detail-back,
   .detail-menu-btn {
     background: var(--gray-1);
     border: none;
     border-radius: 50%;
     width: 40px; height: 40px;
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: 1px;
+    padding: 0;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: background 0.15s;
+    -webkit-tap-highlight-color: transparent;
   }
+  .detail-back:hover,
   .detail-menu-btn:hover { background: var(--gray-2); }
+
+  /* The arrow is a stroked outline; the dots are solid shapes. Hence one uses
+     stroke and the other fill — setting both on one rule would give the dots
+     an unwanted outline. */
+  .icon-back {
+    width: 20px; height: 20px;
+    fill: none;
+    stroke: var(--black);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .icon-more {
+    width: 20px; height: 20px;
+    fill: var(--black);
+  }
 
   .detail-scroll {
     flex: 1;
@@ -2420,10 +2431,12 @@
   </div>
 </div>
 
-<!-- ADD RECIPE MODAL -->
+<!-- ADD / EDIT RECIPE PAGE -->
 <div class="recipe-page" id="add-modal">
   <div class="detail-top">
-    <button class="detail-back" id="recipe-page-back" type="button">←</button>
+    <button class="detail-back" id="recipe-page-back" type="button" aria-label="Tillbaka">
+      <svg class="icon-back" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
     <div class="modal-title">Lägg till recept</div>
     <span class="recipe-page-spacer"></span>
   </div>
@@ -2468,8 +2481,12 @@
 <!-- RECIPE DETAIL MODAL -->
 <div class="detail-modal" id="detail-modal">
   <div class="detail-top">
-    <button class="detail-back" id="detail-back">←</button>
-    <button class="detail-menu-btn" id="detail-menu-btn">···</button>
+    <button class="detail-back" id="detail-back" type="button" aria-label="Tillbaka">
+      <svg class="icon-back" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <button class="detail-menu-btn" id="detail-menu-btn" type="button" aria-label="Fler val">
+      <svg class="icon-more" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>
+    </button>
   </div>
   <div class="detail-scroll">
     <div class="detail-hero" id="detail-emoji"></div>
