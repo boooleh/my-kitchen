@@ -791,9 +791,9 @@
      weight, so nothing told your eye where to start. The category pill was
      the loudest thing on the card (orange on orange-light), which meant the
      category out-shouted the recipe name.
-     Now there are three clear levels: category is a quiet kicker ABOVE the
-     name, the name is the largest thing, and time sits under it. The rating
-     face is pinned to the photo instead of floating in the middle. */
+     Now there are two levels instead of six competing ones: the recipe name
+     owns the first line, and everything that merely describes it — time,
+     category, rating — drops to one quiet grey meta line underneath. */
   .recipe-card {
     background: var(--gray-1);
     border-radius: var(--radius-md);
@@ -806,24 +806,18 @@
   }
   .recipe-card:hover { transform: scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
 
-  /* Wrapper exists purely so the rating face can be positioned against the
-     photo — it needs a positioned parent that hugs the image exactly. */
-  .recipe-thumb-wrap { position: relative; flex-shrink: 0; line-height: 0; }
-
-  /* flex-shrink:0 is needed on the thumbnails themselves as well as on the
-     wrapper — the cooked-log cards place them straight into the card row
-     without a wrapper, and a long recipe name would otherwise squash them. */
+  /* flex-shrink:0 keeps the thumbnail from being squashed by a long name. */
   .recipe-emoji {
-    width: 62px; height: 62px;
+    width: 58px; height: 58px;
     border-radius: 14px;
     background: var(--white);
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.8rem;
+    font-size: 1.7rem;
     flex-shrink: 0;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   }
   .recipe-card-img {
-    width: 62px; height: 62px;
+    width: 58px; height: 58px;
     border-radius: 14px;
     object-fit: cover;
     flex-shrink: 0;
@@ -831,29 +825,43 @@
   }
   .recipe-info { flex: 1; min-width: 0; }
 
-  /* The kicker. Small, uppercase and wide-tracked so it reads as a label
-     rather than as competing text. */
-  .recipe-kicker {
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--orange);
-    margin-bottom: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
   .recipe-name {
     font-family: 'Raleway', sans-serif;
     font-weight: 700;
-    font-size: 1.02rem;
+    font-size: 1rem;
     color: var(--black);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .recipe-meta { font-size: 0.73rem; color: var(--gray-4); margin-top: 4px; }
+
+  /* The meta line: time · category · rating, all one quiet grey size so none
+     of them competes with the name. min-width:0 lets a long item ellipsis
+     instead of pushing the plan button off the card. */
+  .recipe-metarow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 0.73rem;
+    color: var(--gray-4);
+    min-width: 0;
+  }
+  .recipe-metarow > span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .recipe-metarow-tag { font-weight: 600; }
+  /* A drawn dot rather than a "·" character — the character sits on the
+     baseline and renders at a different size in every font. */
+  .recipe-metarow-dot {
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: var(--gray-3);
+    flex-shrink: 0;
+  }
 
   /* The plan button used to be a full-height column with a hairline down its
      left edge, which made one card look like two cards fused together. It's a
@@ -1003,20 +1011,10 @@
   .home-grocery-chevron { color: var(--gray-3); font-size: 1.4rem; flex-shrink: 0; }
 
   /* ── RATINGS ── */
-  /* Pinned to the bottom-right of the card thumbnail. It used to be a loose
-     emoji sitting in the middle of the card row, which read as a stray
+  /* Sits at the end of the card's meta line. It used to float loose in the
+     middle of the card row with nothing anchoring it, which read as a stray
      character rather than as this recipe's rating. */
-  .rating-badge {
-    position: absolute;
-    bottom: -5px; right: -5px;
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    background: var(--white);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.14);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.78rem;
-    line-height: 1;
-  }
+  .rating-badge { font-size: 0.85rem; line-height: 1; flex-shrink: 0; }
 
   .rating-picker { display: flex; gap: 8px; }
   .rating-opt {
@@ -4624,14 +4622,25 @@ async function saveRating(recipe, value) {
 }
 
 // The small faces shown on a recipe card / detail header.
-// One place that builds a card thumbnail, so the photo/emoji choice and the
-// rating badge can never drift apart between the three lists that use them
-// (Hem, Recept, Utforska). The wrapper is what the rating badge anchors to.
+// One place that decides photo-or-emoji, so the three lists that show recipe
+// cards (Hem, Recept, Utforska) can't drift apart.
 function recipeThumbHtml(recipe) {
-  const img = recipe.image_url
+  return recipe.image_url
     ? `<img class="recipe-card-img" src="${recipe.image_url}" alt="${recipe.name}">`
     : `<div class="recipe-emoji">${recipe.emoji}</div>`;
-  return `<div class="recipe-thumb-wrap">${img}${ratingBadgeHtml(recipe)}</div>`;
+}
+
+// The card's second line: time · category · rating. Built from whichever
+// pieces exist and joined with dots, so a recipe missing a time or a category
+// doesn't end up with a dangling separator.
+function recipeMetaRowHtml(recipe) {
+  const parts = [];
+  if (recipe.meta) parts.push(`<span>${recipe.meta}</span>`);
+  if (recipe.tag) parts.push(`<span class="recipe-metarow-tag">${recipe.tag}</span>`);
+  const rating = ratingBadgeHtml(recipe);
+  if (rating) parts.push(rating);
+  if (parts.length === 0) return '';
+  return `<div class="recipe-metarow">${parts.join('<span class="recipe-metarow-dot"></span>')}</div>`;
 }
 
 function ratingBadgeHtml(recipe) {
@@ -4681,9 +4690,8 @@ function renderHome() {
     el.innerHTML = `
       ${recipeThumbHtml(recipe)}
       <div class="recipe-info">
-        ${recipe.tag ? `<div class="recipe-kicker">${recipe.tag}</div>` : ''}
         <div class="recipe-name">${recipe.name}</div>
-        ${recipe.meta ? `<div class="recipe-meta">${recipe.meta}</div>` : ''}
+        ${recipeMetaRowHtml(recipe)}
       </div>
       <button class="recipe-plan-btn active" title="Ta bort från veckan">✓</button>
     `;
@@ -4778,9 +4786,8 @@ function renderRecipes() {
       el.innerHTML = `
         ${recipeThumbHtml(recipe)}
         <div class="recipe-info">
-          ${recipe.tag ? `<div class="recipe-kicker">${recipe.tag}</div>` : ''}
           <div class="recipe-name">${recipe.name}</div>
-          ${recipe.meta ? `<div class="recipe-meta">${recipe.meta}</div>` : ''}
+          ${recipeMetaRowHtml(recipe)}
         </div>
       `;
       el.addEventListener('click', () => openRecipeDetail(recipe));
@@ -4829,9 +4836,8 @@ function renderRecipes() {
     el.innerHTML = `
       ${recipeThumbHtml(recipe)}
       <div class="recipe-info">
-        ${recipe.tag ? `<div class="recipe-kicker">${recipe.tag}</div>` : ''}
         <div class="recipe-name">${recipe.name}</div>
-        ${recipe.meta ? `<div class="recipe-meta">${recipe.meta}</div>` : ''}
+        ${recipeMetaRowHtml(recipe)}
       </div>
       <button class="recipe-plan-btn${recipe.planned ? ' active' : ''}" title="${recipe.planned ? 'Ta bort från veckan' : 'Lägg till i veckan'}">${recipe.planned ? '✓' : '📅'}</button>
     `;
